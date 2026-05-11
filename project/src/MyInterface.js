@@ -19,6 +19,7 @@ export class MyInterface extends CGFinterface {
 
         //Checkbox element in GUI
         this.gui.add(this.scene, 'displayAxis').name('Display Axis');
+        this.gui.add(this.scene, 'sunEnabled').name('Sun On');
 
         return true;
     }

@@ -1,4 +1,6 @@
 import { CGFscene, CGFcamera, CGFaxis } from "../../lib/CGF.js";
+import { MySky } from "./environment/MySky.js";
+import { MyClouds } from "./environment/MyClouds.js";
 
 /**
  * MyScene
@@ -24,9 +26,15 @@ export class MyScene extends CGFscene {
 
     //Initialize scene objects
     this.axis = new CGFaxis(this);
+    this.sky = new MySky(this);
+    this.clouds = new MyClouds(this);
+    this.lastUpdateTime = 0;
+
+    this.setUpdatePeriod(16);
 
     //Objects connected to MyInterface
     this.displayAxis = true;
+    this.sunEnabled = true;
   }
   initLights() {
     this.lights[0].setPosition(15, 2, 5, 1);
@@ -42,6 +50,7 @@ export class MyScene extends CGFscene {
       vec3.fromValues(15, 15, 15),
       vec3.fromValues(0, 0, 0)
     );
+    this.domeRadius = 195; // Keep camera within dome (radius 200 with margin)
   }
   setDefaultAppearance() {
     this.setAmbient(0.2, 0.4, 0.8, 1.0);
@@ -49,6 +58,31 @@ export class MyScene extends CGFscene {
     this.setSpecular(0.2, 0.4, 0.8, 1.0);
     this.setShininess(10.0);
   }
+  
+  constrainCameraToDome() {
+    // Constrain camera position to stay within dome radius
+    const pos = this.camera.position;
+    const dist = Math.sqrt(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]);
+    
+    if (dist > this.domeRadius) {
+      const scale = this.domeRadius / dist;
+      pos[0] *= scale;
+      pos[1] *= scale;
+      pos[2] *= scale;
+    }
+  }
+
+  update(t) {
+    if (this.lastUpdateTime === 0) {
+      this.lastUpdateTime = t;
+      return;
+    }
+
+    const deltaTime = (t - this.lastUpdateTime) / 1000;
+    this.lastUpdateTime = t;
+    this.clouds.update(deltaTime);
+  }
+
   display() {
     // ---- BEGIN Background, camera and axis setup
     // Clear image and depth buffer everytime we update the scene
@@ -57,8 +91,16 @@ export class MyScene extends CGFscene {
     // Initialize Model-View matrix as identity (no transformation
     this.updateProjectionMatrix();
     this.loadIdentity();
+    
+    // Constrain camera to stay within dome
+    this.constrainCameraToDome();
+    
     // Apply transformations corresponding to the camera position relative to the origin
     this.applyViewMatrix();
+
+    if (this.sunEnabled) this.lights[0].enable();
+    else this.lights[0].disable();
+    this.lights[0].update();
 
     this.setDefaultAppearance();
 
@@ -67,6 +109,10 @@ export class MyScene extends CGFscene {
     // Draw
 
     if (this.displayAxis) this.axis.display();
+
+    // Sky dome with radius 200
+    this.sky.display();
+    this.clouds.display();
 
     // ---- END Primitive drawing section
   }
