@@ -37,8 +37,12 @@ export class MyScene extends CGFscene {
     this.sunEnabled = true;
   }
   initLights() {
-    this.lights[0].setPosition(15, 2, 5, 1);
-    this.lights[0].setDiffuse(1.0, 1.0, 1.0, 1.0);
+    // Sun light: directional (w=0), warm color, high-angle direction
+    this.lights[0].setPosition(40, 80, 20, 0);
+    this.lights[0].setAmbient(0.05, 0.045, 0.035, 1.0);
+    this.lights[0].setDiffuse(0.9, 0.85, 0.7, 1.0);
+    this.lights[0].setSpecular(0.9, 0.85, 0.7, 1.0);
+    this.lights[0].setVisible(false);
     this.lights[0].enable();
     this.lights[0].update();
   }
@@ -53,9 +57,10 @@ export class MyScene extends CGFscene {
     this.domeRadius = 195; // Keep camera within dome (radius 200 with margin)
   }
   setDefaultAppearance() {
-    this.setAmbient(0.2, 0.4, 0.8, 1.0);
-    this.setDiffuse(0.2, 0.4, 0.8, 1.0);
-    this.setSpecular(0.2, 0.4, 0.8, 1.0);
+    // Keep scene material mostly neutral so sun color tint is visible.
+    this.setAmbient(0.5, 0.5, 0.5, 1.0);
+    this.setDiffuse(0.7, 0.7, 0.7, 1.0);
+    this.setSpecular(0.15, 0.15, 0.15, 1.0);
     this.setShininess(10.0);
   }
   

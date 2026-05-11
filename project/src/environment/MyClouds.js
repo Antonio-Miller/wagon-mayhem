@@ -18,7 +18,7 @@ export class MyClouds extends CGFobject {
     this.cloudAppearance.setAmbient(1, 1, 1, 0.65);
     this.cloudAppearance.setDiffuse(1, 1, 1, 0.65);
     this.cloudAppearance.setSpecular(0, 0, 0, 1);
-    this.cloudAppearance.setEmission(0.2, 0.2, 0.2, 1);
+    this.cloudAppearance.setEmission(0.7, 0.7, 0.7, 1);
     this.cloudAppearance.setShininess(1);
     this.cloudAppearance.setTexture(this.cloudTexture);
     this.cloudAppearance.setTextureWrap("REPEAT", "REPEAT");
