@@ -1,6 +1,7 @@
 import { CGFscene, CGFcamera, CGFaxis } from "../../lib/CGF.js";
 import { MySky } from "./environment/MySky.js";
 import { MyClouds } from "./environment/MyClouds.js";
+import { MyTerrain } from "./terrain/MyTerrain.js";
 
 /**
  * MyScene
@@ -28,6 +29,7 @@ export class MyScene extends CGFscene {
     this.axis = new CGFaxis(this);
     this.sky = new MySky(this);
     this.clouds = new MyClouds(this);
+    this.terrain = new MyTerrain(this);
     this.lastUpdateTime = 0;
 
     this.setUpdatePeriod(16);
@@ -51,10 +53,11 @@ export class MyScene extends CGFscene {
       0.4,
       0.1,
       500,
-      vec3.fromValues(15, 15, 15),
+      vec3.fromValues(15, 70, 15),
       vec3.fromValues(0, 0, 0)
     );
     this.domeRadius = 195; // Keep camera within dome (radius 200 with margin)
+    this.terrainMinHeight = 25; // Keep camera above terrain peaks
   }
   setDefaultAppearance() {
     // Keep scene material mostly neutral so sun color tint is visible.
@@ -74,6 +77,18 @@ export class MyScene extends CGFscene {
       pos[0] *= scale;
       pos[1] *= scale;
       pos[2] *= scale;
+    }
+  }
+
+  constrainCameraAboveTerrain() {
+    // Keep the camera above the terrain so it never moves underground.
+    const pos = this.camera.position;
+    const target = this.camera.target;
+
+    if (pos[1] < this.terrainMinHeight) {
+      const delta = this.terrainMinHeight - pos[1];
+      pos[1] += delta;
+      target[1] += delta;
     }
   }
 
@@ -99,6 +114,7 @@ export class MyScene extends CGFscene {
     
     // Constrain camera to stay within dome
     this.constrainCameraToDome();
+    this.constrainCameraAboveTerrain();
     
     // Apply transformations corresponding to the camera position relative to the origin
     this.applyViewMatrix();
@@ -118,6 +134,7 @@ export class MyScene extends CGFscene {
     // Sky dome with radius 200
     this.sky.display();
     this.clouds.display();
+    this.terrain.display();
 
     // ---- END Primitive drawing section
   }
