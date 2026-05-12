@@ -29,8 +29,8 @@ export class MyTerrain {
 
     this.shader = new CGFshader(
       this.scene.gl,
-      "/project/shaders/terrain.vert",
-      "/project/shaders/terrain.frag"
+      "/project/src/shaders/terrain.vert",
+      "/project/src/shaders/terrain.frag"
     );
     this.shader.setUniformsValues({
       uHeightmap: 0,
