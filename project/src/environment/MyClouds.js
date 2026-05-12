@@ -4,7 +4,7 @@ import { MySphere } from "../primitives/MySphere.js";
 export class MyClouds extends CGFobject {
   constructor(scene) {
     super(scene);
-    this.radius = 190;
+    this.radius = 195;
     this.cloudSpeed = 0.02;
     this.textureOffset = 0;
     this.repeatU = 4;

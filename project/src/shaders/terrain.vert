@@ -39,12 +39,14 @@ uniform materialProperties uFrontMaterial;
 uniform materialProperties uBackMaterial;
 
 uniform sampler2D uHeightmap;
+uniform sampler2D uTerrainTexture;
 uniform float uMaxHeight;
 uniform float uTerrainStep;
 uniform float uTexelStep;
 
 out vec4 vFinalColor;
 out vec2 vTextureCoord;
+out float vHeight;
 
 vec4 lighting(vec4 vertex, vec3 E, vec3 N) {
     vec4 result = vec4(0.0);
@@ -118,8 +120,7 @@ void main() {
 
     vFinalColor = lighting(vertex, E, normal);
     gl_Position = uPMatrix * vertex;
+    vHeight = height;
 
-    if (uUseTexture) {
-        vTextureCoord = uv;
-    }
+    vTextureCoord = uv;
 }

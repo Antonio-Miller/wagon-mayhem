@@ -52,8 +52,8 @@ export class MyScene extends CGFscene {
     this.camera = new CGFcamera(
       0.4,
       0.1,
-      500,
-      vec3.fromValues(15, 70, 15),
+      1000,
+      vec3.fromValues(200, 200, 200),
       vec3.fromValues(0, 0, 0)
     );
     this.domeRadius = 195; // Keep camera within dome (radius 200 with margin)
@@ -68,6 +68,12 @@ export class MyScene extends CGFscene {
   }
   
   constrainCameraToDome() {
+    // Force target to center (0,0,0)
+    // We enforce this here so panning is effectively disabled and we always look at the center.
+    this.camera.target[0] = 0;
+    this.camera.target[1] = 0;
+    this.camera.target[2] = 0;
+
     // Constrain camera position to stay within dome radius
     const pos = this.camera.position;
     const dist = Math.sqrt(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]);
@@ -83,12 +89,12 @@ export class MyScene extends CGFscene {
   constrainCameraAboveTerrain() {
     // Keep the camera above the terrain so it never moves underground.
     const pos = this.camera.position;
-    const target = this.camera.target;
+    
+    // Sample the exact terrain height at the camera's XZ position, and add a small padding (h+5)
+    let minH = this.terrain ? this.terrain.getHeightAt(pos[0], pos[2]) + 5 : this.terrainMinHeight;
 
-    if (pos[1] < this.terrainMinHeight) {
-      const delta = this.terrainMinHeight - pos[1];
-      pos[1] += delta;
-      target[1] += delta;
+    if (pos[1] < minH) {
+      pos[1] = minH;
     }
   }
 
@@ -112,7 +118,7 @@ export class MyScene extends CGFscene {
     this.updateProjectionMatrix();
     this.loadIdentity();
     
-    // Constrain camera to stay within dome
+    // Constrain camera to stay within dome and above terrain
     this.constrainCameraToDome();
     this.constrainCameraAboveTerrain();
     

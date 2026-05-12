@@ -4,10 +4,10 @@ import { MyPlane } from "../primitives/MyPlane.js";
 export class MyTerrain {
   constructor(
     scene,
-    divisions = 100,
+    divisions = 256,
     size = 800,
-    maxHeight = 10  ,
-    heightmapPath = "/tp5/textures/terrainmap.jpg"
+    maxHeight = 120,
+    heightmapPath = "/project/textures/Rugged%20Terrain%20Height%20Map%20PNG.png"
   ) {
     this.scene = scene;
     this.divisions = divisions;
@@ -17,15 +17,16 @@ export class MyTerrain {
 
     this.plane = new MyPlane(scene, divisions, size, size);
     this.heightmap = new CGFtexture(this.scene, heightmapPath);
+    this.terrainTexture = new CGFtexture(this.scene, "/project/textures/Rugged%20Terrain%20Diffuse%20PNG.png");
     this.heightmapCanvas = document.createElement("canvas");
     this.heightmapContext = this.heightmapCanvas.getContext("2d", { willReadFrequently: true });
     this.heightmapPixels = null;
 
     this.appearance = new CGFappearance(this.scene);
-    this.appearance.setAmbient(0.45, 0.55, 0.35, 1);
-    this.appearance.setDiffuse(0.55, 0.7, 0.42, 1);
-    this.appearance.setSpecular(0.1, 0.1, 0.1, 1);
-    this.appearance.setShininess(10);
+    this.appearance.setAmbient(0.85, 0.85, 0.85, 1);
+    this.appearance.setDiffuse(1.0, 1.0, 1.0, 1);
+    this.appearance.setSpecular(0.04, 0.04, 0.04, 1);
+    this.appearance.setShininess(6);
 
     this.shader = new CGFshader(
       this.scene.gl,
@@ -34,9 +35,11 @@ export class MyTerrain {
     );
     this.shader.setUniformsValues({
       uHeightmap: 0,
+      uTerrainTexture: 1,
       uMaxHeight: this.maxHeight,
       uTerrainStep: this.size / this.divisions,
       uTexelStep: 1.0 / this.divisions,
+      uTileScale: 1.0,
     });
   }
 
@@ -55,6 +58,14 @@ export class MyTerrain {
     this.heightmapContext.clearRect(0, 0, image.width, image.height);
     this.heightmapContext.drawImage(image, 0, 0);
     this.heightmapPixels = this.heightmapContext.getImageData(0, 0, image.width, image.height).data;
+    
+    // Once the image is available, set a more accurate texel step
+    // based on the heightmap resolution so the shader samples neighbors
+    // correctly when the plane is highly subdivided.
+    const maxDim = Math.max(image.width, image.height);
+    if (this.shader) {
+      this.shader.setUniformsValues({ uTexelStep: 1.0 / maxDim });
+    }
   }
 
   getHeightAt(worldX, worldZ) {
@@ -80,7 +91,7 @@ export class MyTerrain {
   }
 
   display() {
-    if (!this.heightmap || this.heightmap.texID === -1) {
+    if (!this.heightmap || this.heightmap.texID === -1 || !this.terrainTexture || this.terrainTexture.texID === -1) {
       return;
     }
 
@@ -91,13 +102,17 @@ export class MyTerrain {
     this.scene.enableTextures(true);
     this.shader.setUniformsValues({
       uHeightmap: 0,
+      uTerrainTexture: 1,
       uMaxHeight: this.maxHeight,
       uTerrainStep: this.size / this.divisions,
       uTexelStep: 1.0 / this.divisions,
+      uTileScale: 1.0,
     });
     this.appearance.apply();
     this.heightmap.bind(0);
+    this.terrainTexture.bind(1);
     this.plane.display();
+    this.terrainTexture.unbind(1);
     this.heightmap.unbind(0);
 
     this.scene.enableTextures(previousTexturesEnabled);
