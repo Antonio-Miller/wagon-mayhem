@@ -6,7 +6,7 @@ export class MySky extends CGFobject {
     super(scene);
     
     // Create half-sphere with radius 200 and inward-facing normals
-    this.sphere = new MySphere(scene, 16, 32, 200, true);
+    this.sphere = new MySphere(scene, 16, 32, 400, true);
     
     // Load sky texture
     this.skyTexture = new CGFtexture(this.scene, '/project/textures/sky.jpg');
@@ -29,18 +29,6 @@ export class MySky extends CGFobject {
 
     this.scene.pushMatrix();
 
-    // Disable depth writing so sky doesn't occlude scene
-    const gl = this.scene.gl;
-    const prevDepthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
-    gl.depthMask(false);
-
-    // Disable backface culling since we're inside the dome with inward normals
-    const cullEnabled = gl.isEnabled(gl.CULL_FACE);
-    if (cullEnabled) gl.disable(gl.CULL_FACE);
-
-    // Store previous state
-    const prevTexturesEnabled = this.scene.texturesEnabled;
-
     // Enable textures and set appearance
     this.scene.setActiveShader(this.scene.defaultShader);
     this.scene.enableTextures(true);
@@ -48,14 +36,6 @@ export class MySky extends CGFobject {
     
     this.sphere.display();
 
-    // Restore backface culling
-    if (cullEnabled) gl.enable(gl.CULL_FACE);
-
-    // Restore previous texture state
-    this.scene.enableTextures(prevTexturesEnabled);
-    
-    // Restore depth mask
-    gl.depthMask(prevDepthMask);
 
     this.scene.popMatrix();
   }
