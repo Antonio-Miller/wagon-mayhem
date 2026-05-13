@@ -1,12 +1,13 @@
 import { CGFobject } from "../../../lib/CGF.js";
 
 export class MySphere extends CGFobject {
-  constructor(scene, stacks = 16, slices = 32, radius = 1, hemisphere = false) {
+  constructor(scene, stacks = 16, slices = 32, radius = 1, hemisphere = false, inverted = false) {
     super(scene);
     this.stacks = stacks;
     this.slices = slices;
     this.radius = radius;
     this.hemisphere = hemisphere;
+    this.inverted = inverted;
     this.initBuffers();
   }
 
@@ -33,7 +34,11 @@ export class MySphere extends CGFobject {
         const z = this.radius * sinTheta * sinPhi;
 
         this.vertices.push(x, y, z);
-        this.normals.push(-sinTheta * cosPhi, -cosTheta, -sinTheta * sinPhi);
+        if (this.inverted) {
+          this.normals.push(-sinTheta * cosPhi, -cosTheta, -sinTheta * sinPhi);
+        } else {
+          this.normals.push(sinTheta * cosPhi, cosTheta, sinTheta * sinPhi);
+        }
         this.texCoords.push(j / this.slices, i / this.stacks);
       }
     }
@@ -43,8 +48,13 @@ export class MySphere extends CGFobject {
         const first = i * (this.slices + 1) + j;
         const second = first + this.slices + 1;
 
-        this.indices.push(first, second, first + 1);
-        this.indices.push(second, second + 1, first + 1);
+        if (this.inverted) {
+          this.indices.push(first, second, first + 1);
+          this.indices.push(second, second + 1, first + 1);
+        } else {
+          this.indices.push(first, first + 1, second);
+          this.indices.push(second, first + 1, second + 1);
+        }
       }
     }
 

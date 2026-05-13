@@ -4,6 +4,10 @@ import { MyPlane } from "../primitives/MyPlane.js";
 export class MyTerrain {
   constructor(
     scene,
+    // Note: WebGL 16-bit indices limit vertices to 65,535.
+    // At divisions = 256, (256+1)^2 = 66,049 vertices, which overflows and causes
+    // triangles to wrap around and stretch across the scene. 
+    // divisions = 120 keeps it safely under the limit (14,641 vertices).
     divisions = 120,
     size = 800,
     maxHeight = 120,

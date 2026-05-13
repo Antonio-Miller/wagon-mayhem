@@ -2,6 +2,7 @@ import { CGFscene, CGFcamera, CGFaxis } from "../../lib/CGF.js";
 import { MySky } from "./environment/MySky.js";
 import { MyClouds } from "./environment/MyClouds.js";
 import { MyTerrain } from "./terrain/MyTerrain.js";
+import { MyRockSet } from "./environment/MyRockSet.js";
 
 /**
  * MyScene
@@ -30,6 +31,7 @@ export class MyScene extends CGFscene {
     this.sky = new MySky(this);
     this.clouds = new MyClouds(this);
     this.terrain = new MyTerrain(this);
+    this.rocks = new MyRockSet(this, 40, this.terrain);
     this.lastUpdateTime = 0;
 
     this.setUpdatePeriod(16);
@@ -68,9 +70,6 @@ export class MyScene extends CGFscene {
   }
   
   constrainCameraToDome() {
-    // Force target to center (0,0,0)
-    // We enforce this here so panning is effectively disabled and we always look at the center.
-    
 
     // Constrain camera position to stay within dome radius
     const pos = this.camera.position;
@@ -135,10 +134,12 @@ export class MyScene extends CGFscene {
 
     if (this.displayAxis) this.axis.display();
 
+    this.rocks.display();
     // Sky dome with radius 200
     this.sky.display();
     this.clouds.display();
     this.terrain.display();
+    
 
     // ---- END Primitive drawing section
   }
