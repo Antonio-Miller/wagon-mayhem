@@ -4,7 +4,7 @@ import { MyPlane } from "../primitives/MyPlane.js";
 export class MyTerrain {
   constructor(
     scene,
-    divisions = 256,
+    divisions = 120,
     size = 800,
     maxHeight = 120,
     heightmapPath = "/project/textures/Rugged%20Terrain%20Height%20Map%20PNG.png"

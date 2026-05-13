@@ -70,9 +70,7 @@ export class MyScene extends CGFscene {
   constrainCameraToDome() {
     // Force target to center (0,0,0)
     // We enforce this here so panning is effectively disabled and we always look at the center.
-    this.camera.target[0] = 0;
-    this.camera.target[1] = 60;
-    this.camera.target[2] = 0;
+    
 
     // Constrain camera position to stay within dome radius
     const pos = this.camera.position;
@@ -119,8 +117,8 @@ export class MyScene extends CGFscene {
     this.loadIdentity();
     
     // Constrain camera to stay within dome and above terrain
-    //this.constrainCameraToDome();
-    //this.constrainCameraAboveTerrain();
+    this.constrainCameraToDome();
+    this.constrainCameraAboveTerrain();
     
     // Apply transformations corresponding to the camera position relative to the origin
     this.applyViewMatrix();

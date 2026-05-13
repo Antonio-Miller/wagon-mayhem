@@ -6,7 +6,7 @@ export class MySky extends CGFobject {
     super(scene);
     
     // Create half-sphere with radius 200 and inward-facing normals
-    this.sphere = new MySphere(scene, 16, 32, 400, true);
+    this.sphere = new MySphere(scene, 16, 32, 300, true);
     
     // Load sky texture
     this.skyTexture = new CGFtexture(this.scene, '/project/textures/sky.jpg');

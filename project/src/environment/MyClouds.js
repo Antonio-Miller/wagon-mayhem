@@ -9,7 +9,7 @@ export class MyClouds extends CGFobject {
     this.repeatU = 4;
     this.repeatV = 2;
 
-    this.dome = new MySphere(scene, 20, 40, 395, true);
+    this.dome = new MySphere(scene, 20, 40, 295, true);
     this.baseTexCoords = Array.from(this.dome.texCoords);
 
     this.cloudTexture = new CGFtexture(this.scene, "/project/textures/clouds.png");
