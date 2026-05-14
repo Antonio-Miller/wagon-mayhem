@@ -85,7 +85,7 @@ export class MyScene extends CGFscene {
       vec3.fromValues(200, 200, 200),
       vec3.fromValues(0, 0, 0)
     );
-    this.domeRadius = 195; // Keep camera within dome (radius 200 with margin)
+    this.domeRadius = 295; // Keep camera within dome (radius 200 with margin)
     this.terrainMinHeight = 25; // Keep camera above terrain peaks
   }
   setDefaultAppearance() {
