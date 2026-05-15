@@ -15,13 +15,28 @@ export class MyRockSet extends CGFobject {
     this.rockMaterial.setShininess(10);
     
     // Pre-generate the rock transforms and geometry
+    // generate scattered positions with minimum spacing to avoid clustering
+    const positions = [];
+    const minSpacing = 12; // minimum distance between rocks
+    const maxAttempts = 50;
+
     for (let i = 0; i < amount; i++) {
-        // Random angle and distance keeping them inside the dome (radius <= 290)
-        let angle = Math.random() * Math.PI * 2;
-        let radius = Math.random() * 290;
-        
-        let x = Math.cos(angle) * radius;
-        let z = Math.sin(angle) * radius;
+      let x, z;
+      let attempts = 0;
+      do {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 290;
+        x = Math.cos(angle) * radius;
+        z = Math.sin(angle) * radius;
+        attempts++;
+        if (attempts > maxAttempts) break;
+      } while (positions.some(p => {
+        const dx = p.x - x;
+        const dz = p.z - z;
+        return dx*dx + dz*dz < minSpacing*minSpacing;
+      }));
+
+      positions.push({x, z});
         
         // Randomize sizes to make them larger and more irregular
         let scaleX = 1.8 + Math.random() * 3.2;
@@ -34,10 +49,10 @@ export class MyRockSet extends CGFobject {
         let rotZ = Math.random() * Math.PI;
 
         this.rocks.push({
-            rock: new MyRock(this.scene),
-            x: x, 
-            y: 0, 
-            z: z,
+          rock: new MyRock(this.scene),
+          x: x,
+          y: 0,
+          z: z,
             scaleX: scaleX, 
             scaleY: scaleY, 
             scaleZ: scaleZ,
@@ -46,6 +61,30 @@ export class MyRockSet extends CGFobject {
             rotZ: rotZ,
             placed: false // We cannot set their Y properly until the terrain's heightmap image has finished loading!
         });
+    }
+  }
+
+  constrainCamera(cameraPosition) {
+    for (let i = 0; i < this.rocks.length; i++) {
+      const rock = this.rocks[i];
+
+      if (!rock.placed) {
+        continue;
+      }
+
+      const dx = cameraPosition[0] - rock.x;
+      const dz = cameraPosition[2] - rock.z;
+      const dy = cameraPosition[1] - rock.y;
+      const radius = Math.max(rock.scaleX, rock.scaleY, rock.scaleZ) * 0.55;
+      const distanceSquared = dx * dx + dy * dy + dz * dz;
+
+      if (distanceSquared > 0 && distanceSquared < radius * radius) {
+        const distance = Math.sqrt(distanceSquared);
+        const scale = radius / distance;
+        cameraPosition[0] = rock.x + dx * scale;
+        cameraPosition[1] = rock.y + dy * scale;
+        cameraPosition[2] = rock.z + dz * scale;
+      }
     }
   }
 

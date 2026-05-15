@@ -4,7 +4,7 @@ import { MySky } from "./environment/MySky.js";
 import { MyClouds } from "./environment/MyClouds.js";
 import { MyTerrain } from "./terrain/MyTerrain.js";
 import { MyRockSet } from "./environment/MyRockSet.js";
-import { MyPineTree } from "./environment/MyPineTree.js";
+import { MyPineTreeSet } from "./environment/MyPineTreeSet.js";
 
 /**
  * MyScene
@@ -35,8 +35,7 @@ export class MyScene extends CGFscene {
     this.clouds = new MyClouds(this);
     this.terrain = new MyTerrain(this);
     this.rocks = new MyRockSet(this, 50, this.terrain);
-    this.pineTree = new MyPineTree(this);
-    this.pineTreePosition = { x: -90, z: 55 };
+    this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
     this.lastUpdateTime = 0;
 
     this.setUpdatePeriod(16);
@@ -125,6 +124,18 @@ export class MyScene extends CGFscene {
     }
   }
 
+  constrainCameraToObjects() {
+    const pos = this.camera.position;
+
+    if (this.rocks) {
+      this.rocks.constrainCamera(pos);
+    }
+
+    if (this.pineTrees) {
+      this.pineTrees.constrainCamera(pos);
+    }
+  }
+
   update(t) {
     if (this.lastUpdateTime === 0) {
       this.lastUpdateTime = t;
@@ -148,6 +159,7 @@ export class MyScene extends CGFscene {
     // Constrain camera to stay within dome and above terrain
     this.constrainCameraToDome();
     this.constrainCameraAboveTerrain();
+    this.constrainCameraToObjects();
     
     // Apply transformations corresponding to the camera position relative to the origin
     this.applyViewMatrix();
@@ -170,14 +182,7 @@ export class MyScene extends CGFscene {
     if (this.displayAxis) this.axis.display();
 
     this.rocks.display();
-    this.pushMatrix();
-    this.translate(
-      this.pineTreePosition.x,
-      this.terrain ? this.terrain.getHeightAt(this.pineTreePosition.x, this.pineTreePosition.z) : 0,
-      this.pineTreePosition.z
-    );
-    this.pineTree.display();
-    this.popMatrix();
+    this.pineTrees.display();
     // Sky dome with radius 200
     this.sky.display();
     this.clouds.display();
