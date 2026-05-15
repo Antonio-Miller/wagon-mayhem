@@ -41,12 +41,13 @@ uniform materialProperties uBackMaterial;
 uniform sampler2D uHeightmap;
 uniform sampler2D uTerrainTexture;
 uniform float uMaxHeight;
-uniform float uTerrainStep;
+uniform float uTerrainDiameter;
 uniform float uTexelStep;
 
 out vec4 vFinalColor;
 out vec2 vTextureCoord;
 out float vHeight;
+out vec2 vWorldXZ;
 
 vec4 lighting(vec4 vertex, vec3 E, vec3 N) {
     vec4 result = vec4(0.0);
@@ -110,8 +111,9 @@ void main() {
     float heightUp = sampleHeight(uv + vec2(0.0, uTexelStep));
 
     vec3 displacedPosition = vec3(aVertexPosition.x, height, aVertexPosition.z);
-    vec3 tangentX = vec3(uTerrainStep * 2.0, heightRight - heightLeft, 0.0);
-    vec3 tangentZ = vec3(0.0, heightUp - heightDown, uTerrainStep * 2.0);
+    float worldStep = uTexelStep * uTerrainDiameter;
+    vec3 tangentX = vec3(worldStep * 2.0, heightRight - heightLeft, 0.0);
+    vec3 tangentZ = vec3(0.0, heightUp - heightDown, worldStep * 2.0);
     vec3 normal = normalize(cross(tangentZ, tangentX));
 
     vec4 vertex = uMVMatrix * vec4(displacedPosition, 1.0);
@@ -123,4 +125,5 @@ void main() {
     vHeight = height;
 
     vTextureCoord = uv;
+    vWorldXZ = vec2(aVertexPosition.x, aVertexPosition.z);
 }

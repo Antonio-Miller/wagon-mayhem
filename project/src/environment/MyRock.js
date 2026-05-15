@@ -1,5 +1,6 @@
 import { CGFobject } from "../../../lib/CGF.js";
 import { MySphere } from "../primitives/MySphere.js";
+import { SimplexNoise } from "../utils/SimplexNoise.js";
 
 export class MyRock extends CGFobject {
   constructor(scene) {
@@ -10,38 +11,41 @@ export class MyRock extends CGFobject {
     const stacks = Math.floor(Math.random() * 4) + 4; // 4 to 7 stacks
     
     this.sphere = new MySphere(scene, slices, stacks, 1.0, false);
+    this.noise = new SimplexNoise(Math.floor(Math.random() * 0xffffffff));
+    this.noiseOffset = Math.random() * 1000;
     
-    // Jitter each vertex position slightly so it stops looking like a perfect sphere
-    // and looks more like a jagged piece of rock.
-    // Ensure that the poles and the seams (where slice 0 and slice N meet) 
-    // get the same offset to prevent gaps in the mesh.
     const slicesCount = this.sphere.slices;
     const stacksCount = this.sphere.stacks;
 
     for (let i = 0; i <= stacksCount; i++) {
-      // For the poles, we want a single uniform offset for all vertices at that pole
-      let poleOffset = 0.8 + Math.random() * 0.4;
-      
-      // Generate offsets for the slices
-      let sliceOffsets = [];
-      for (let j = 0; j < slicesCount; j++) {
-        sliceOffsets.push(0.8 + Math.random() * 0.4);
-      }
-      // The last slice wraps around and must match the first slice's offset
-      sliceOffsets.push(sliceOffsets[0]);
-
       for (let j = 0; j <= slicesCount; j++) {
-        let offset = sliceOffsets[j];
-        
-        // If it's a pole, override the offset
-        if (i === 0 || (i === stacksCount && !this.sphere.hemisphere)) {
-           offset = poleOffset;
-        }
+        const wrappedJ = j === slicesCount ? 0 : j;
+        const vertexIndex = (i * (slicesCount + 1) + j) * 3;
+        const x = this.sphere.vertices[vertexIndex];
+        const y = this.sphere.vertices[vertexIndex + 1];
+        const z = this.sphere.vertices[vertexIndex + 2];
 
-        let vertexIndex = (i * (slicesCount + 1) + j) * 3;
-        this.sphere.vertices[vertexIndex] *= offset;
-        this.sphere.vertices[vertexIndex + 1] *= offset;
-        this.sphere.vertices[vertexIndex + 2] *= offset;
+        const u = wrappedJ / slicesCount;
+        const v = i / stacksCount;
+        const noiseValue = this.noise.fbm2D(
+          u * 3.5 + this.noiseOffset,
+          v * 3.5 + this.noiseOffset,
+          4
+        );
+        const equatorBias = Math.sin(v * Math.PI);
+        const displacement = 1 + 0.18 * noiseValue * (0.35 + 0.65 * equatorBias);
+
+        const nx = x * displacement;
+        const ny = y * displacement;
+        const nz = z * displacement;
+        const length = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+
+        this.sphere.vertices[vertexIndex] = nx;
+        this.sphere.vertices[vertexIndex + 1] = ny;
+        this.sphere.vertices[vertexIndex + 2] = nz;
+        this.sphere.normals[vertexIndex] = nx / length;
+        this.sphere.normals[vertexIndex + 1] = ny / length;
+        this.sphere.normals[vertexIndex + 2] = nz / length;
       }
     }
     

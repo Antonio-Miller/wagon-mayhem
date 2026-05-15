@@ -36,6 +36,17 @@ export class MyScene extends CGFscene {
     this.terrain = new MyTerrain(this);
     this.rocks = new MyRockSet(this, 50, this.terrain);
     this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
+
+    const halfW = 110;
+    const halfD = 70;
+    const pathWidth = 10;
+    const pathCorners = [
+      -halfW, -halfD,
+      halfW, -halfD,
+      halfW, halfD,
+      -halfW, halfD,
+    ];
+    this.terrain.setPathUniforms(pathCorners, pathWidth / 2, [0.72, 0.54, 0.36], 0.92);
     this.lastUpdateTime = 0;
 
     this.setUpdatePeriod(16);

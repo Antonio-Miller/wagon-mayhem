@@ -45,6 +45,44 @@ export class MyTerrain {
       uTexelStep: 1.0 / this.divisions,
       uTileScale: 1.0,
     });
+
+    this.pathCorners = null;
+    this.pathHalfWidth = 0.0;
+    this.pathColor = [0.72, 0.54, 0.36];
+    this.pathBlend = 0.92;
+  }
+
+  setPathUniforms(corners, halfWidth, color, blend) {
+    this.pathCorners = corners ? new Float32Array(corners) : null;
+    this.pathHalfWidth = halfWidth;
+    this.pathColor = color ?? this.pathColor;
+    this.pathBlend = blend ?? this.pathBlend;
+
+    if (!this.pathCorners || this.pathCorners.length !== 8) {
+      return;
+    }
+
+    const gl = this.scene.gl;
+    const program = this.shader && this.shader.program;
+    if (!program) {
+      return;
+    }
+
+    const prevProgram = gl.getParameter(gl.CURRENT_PROGRAM);
+    gl.useProgram(program);
+
+    const cornersLoc = gl.getUniformLocation(program, "uPathCorners");
+    if (cornersLoc) {
+      gl.uniform2fv(cornersLoc, this.pathCorners);
+    }
+
+    this.shader.setUniformsValues({
+      uPathHalfWidth: this.pathHalfWidth,
+      uPathColor: this.pathColor,
+      uPathBlend: this.pathBlend,
+    });
+
+    gl.useProgram(prevProgram);
   }
 
   ensureHeightmapPixels() {
@@ -86,12 +124,27 @@ export class MyTerrain {
 
     const imageWidth = this.heightmapCanvas.width;
     const imageHeight = this.heightmapCanvas.height;
-    const pixelX = Math.min(imageWidth - 1, Math.max(0, Math.floor(u * imageWidth)));
-    const pixelY = Math.min(imageHeight - 1, Math.max(0, Math.floor(v * imageHeight)));
-    const index = (pixelY * imageWidth + pixelX) * 4;
-    const heightSample = this.heightmapPixels[index] / 255;
 
-    return heightSample * this.maxHeight;
+    const px = u * (imageWidth - 1);
+    const py = v * (imageHeight - 1);
+    const x0 = Math.max(0, Math.floor(px));
+    const y0 = Math.max(0, Math.floor(py));
+    const x1 = Math.min(imageWidth - 1, x0 + 1);
+    const y1 = Math.min(imageHeight - 1, y0 + 1);
+    const tx = px - x0;
+    const ty = py - y0;
+
+    const sample = (xi, yi) => this.heightmapPixels[(yi * imageWidth + xi) * 4] / 255;
+
+    const h00 = sample(x0, y0);
+    const h10 = sample(x1, y0);
+    const h01 = sample(x0, y1);
+    const h11 = sample(x1, y1);
+
+    const height = (h00 * (1 - tx) + h10 * tx) * (1 - ty)
+      + (h01 * (1 - tx) + h11 * tx) * ty;
+
+    return height * this.maxHeight;
   }
 
   display() {
@@ -112,6 +165,21 @@ export class MyTerrain {
       uTexelStep: 1.0 / this.divisions,
       uTileScale: 1.0,
     });
+
+    if (this.pathCorners && this.pathCorners.length === 8) {
+      this.shader.setUniformsValues({
+        uPathHalfWidth: this.pathHalfWidth,
+        uPathColor: this.pathColor,
+        uPathBlend: this.pathBlend,
+      });
+
+      const gl = this.scene.gl;
+      const cornersLoc = gl.getUniformLocation(this.shader.program, "uPathCorners");
+      if (cornersLoc) {
+        gl.uniform2fv(cornersLoc, this.pathCorners);
+      }
+    }
+
     this.appearance.apply();
     this.heightmap.bind(0);
     this.terrainTexture.bind(1);
