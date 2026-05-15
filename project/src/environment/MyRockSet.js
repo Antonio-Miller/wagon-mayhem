@@ -23,10 +23,10 @@ export class MyRockSet extends CGFobject {
         let x = Math.cos(angle) * radius;
         let z = Math.sin(angle) * radius;
         
-        // Randomize sizes to make them all look completely different and irregular
-        let scaleX = 1.0 + Math.random() * 3.0;
-        let scaleY = 1.0 + Math.random() * 3.0;
-        let scaleZ = 1.0 + Math.random() * 3.0;
+        // Randomize sizes to make them larger and more irregular
+        let scaleX = 1.8 + Math.random() * 3.2;
+        let scaleY = 1.8 + Math.random() * 3.2;
+        let scaleZ = 1.8 + Math.random() * 3.2;
         
         // Random orientation
         let rotX = Math.random() * Math.PI;

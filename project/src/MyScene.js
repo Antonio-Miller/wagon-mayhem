@@ -4,6 +4,7 @@ import { MySky } from "./environment/MySky.js";
 import { MyClouds } from "./environment/MyClouds.js";
 import { MyTerrain } from "./terrain/MyTerrain.js";
 import { MyRockSet } from "./environment/MyRockSet.js";
+import { MyPineTree } from "./environment/MyPineTree.js";
 
 /**
  * MyScene
@@ -33,7 +34,9 @@ export class MyScene extends CGFscene {
     this.sky = new MySky(this);
     this.clouds = new MyClouds(this);
     this.terrain = new MyTerrain(this);
-    this.rocks = new MyRockSet(this, 40, this.terrain);
+    this.rocks = new MyRockSet(this, 50, this.terrain);
+    this.pineTree = new MyPineTree(this);
+    this.pineTreePosition = { x: -90, z: 55 };
     this.lastUpdateTime = 0;
 
     this.setUpdatePeriod(16);
@@ -167,6 +170,14 @@ export class MyScene extends CGFscene {
     if (this.displayAxis) this.axis.display();
 
     this.rocks.display();
+    this.pushMatrix();
+    this.translate(
+      this.pineTreePosition.x,
+      this.terrain ? this.terrain.getHeightAt(this.pineTreePosition.x, this.pineTreePosition.z) : 0,
+      this.pineTreePosition.z
+    );
+    this.pineTree.display();
+    this.popMatrix();
     // Sky dome with radius 200
     this.sky.display();
     this.clouds.display();
