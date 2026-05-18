@@ -6,6 +6,7 @@ import { MyTerrain } from "./terrain/MyTerrain.js";
 import { MyRockSet } from "./environment/MyRockSet.js";
 import { MyPineTreeSet } from "./environment/MyPineTreeSet.js";
 import { MyGrass } from "./environment/MyGrass.js";
+import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
 
 /**
  * MyScene
@@ -62,6 +63,7 @@ export class MyScene extends CGFscene {
     this.grass = new MyGrass(this, this.terrain);
     this.rocks = new MyRockSet(this, 50, this.terrain);
     this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
+    this.flowers = new MyFlowerSet(this, 80, this.terrain, this.rocks, this.pineTrees);
     this.lastUpdateTime = 0;
     this.cameraDebugEnabled = true;
     this.cameraDebugIntervalMs = 500;
@@ -234,6 +236,7 @@ export class MyScene extends CGFscene {
     this.clouds.display();
     this.terrain.display();
     this.grass.display();
+    this.flowers.display();
     
 
     // ---- END Primitive drawing section
