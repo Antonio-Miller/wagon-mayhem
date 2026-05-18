@@ -236,6 +236,45 @@ export class MyTerrain {
     });
   }
 
+  isPointOnPath(worldX, worldZ, margin = 0) {
+    if (this.pathEnabled && this.pathCorners && this.pathCorners.length >= 8) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+
+      for (let i = 0; i < this.pathCorners.length; i += 2) {
+        const x = this.pathCorners[i];
+        const z = this.pathCorners[i + 1];
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minZ = Math.min(minZ, z);
+        maxZ = Math.max(maxZ, z);
+      }
+
+      if (
+        worldX >= minX - margin &&
+        worldX <= maxX + margin &&
+        worldZ >= minZ - margin &&
+        worldZ <= maxZ + margin
+      ) {
+        return true;
+      }
+    }
+
+    if (this.circularAreaEnabled) {
+      const dx = worldX - this.pathCenterX;
+      const dz = worldZ - this.pathCenterZ;
+      const radius = this.circularAreaRadius + margin;
+
+      if (dx * dx + dz * dz <= radius * radius) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   ensureHeightmapPixels() {
     if (this.heightmapPixels || !this.heightmap || this.heightmap.texID === -1) {
       return;

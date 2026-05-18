@@ -5,6 +5,7 @@ import { MyClouds } from "./environment/MyClouds.js";
 import { MyTerrain } from "./terrain/MyTerrain.js";
 import { MyRockSet } from "./environment/MyRockSet.js";
 import { MyPineTreeSet } from "./environment/MyPineTreeSet.js";
+import { MyGrass } from "./environment/MyGrass.js";
 
 /**
  * MyScene
@@ -34,8 +35,6 @@ export class MyScene extends CGFscene {
     this.sky = new MySky(this);
     this.clouds = new MyClouds(this);
     this.terrain = new MyTerrain(this);
-    this.rocks = new MyRockSet(this, 50, this.terrain);
-    this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
 
     const halfW = 110;
     const halfD = 70;
@@ -59,6 +58,10 @@ export class MyScene extends CGFscene {
       0.92,
       10.0
     );
+
+    this.grass = new MyGrass(this, this.terrain);
+    this.rocks = new MyRockSet(this, 50, this.terrain);
+    this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
     this.lastUpdateTime = 0;
     this.cameraDebugEnabled = true;
     this.cameraDebugIntervalMs = 500;
@@ -163,14 +166,23 @@ export class MyScene extends CGFscene {
   }
 
   update(t) {
+    this.time = t / 1000;
+
     if (this.lastUpdateTime === 0) {
       this.lastUpdateTime = t;
+      if (this.grass) {
+        this.grass.update(this.time);
+      }
       return;
     }
 
     const deltaTime = (t - this.lastUpdateTime) / 1000;
     this.lastUpdateTime = t;
     this.clouds.update(deltaTime);
+
+    if (this.grass) {
+      this.grass.update(this.time);
+    }
 
     if (this.cameraDebugEnabled && t - this.lastCameraDebugLogTime >= this.cameraDebugIntervalMs) {
       const pos = this.camera.position;
@@ -221,6 +233,7 @@ export class MyScene extends CGFscene {
     this.sky.display();
     this.clouds.display();
     this.terrain.display();
+    this.grass.display();
     
 
     // ---- END Primitive drawing section
