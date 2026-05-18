@@ -121,7 +121,7 @@ export class MyGrass extends CGFobject {
         const sampleX = x + this.randomRange(-jitter, jitter);
         const sampleZ = z + this.randomRange(-jitter, jitter);
 
-        if (this.terrain?.isPointOnPath && this.terrain.isPointOnPath(sampleX, sampleZ, this.pathClearance)) {
+        if (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(sampleX, sampleZ, this.pathClearance)) {
           continue;
         }
 

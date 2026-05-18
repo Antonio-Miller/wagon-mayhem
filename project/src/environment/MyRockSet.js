@@ -6,6 +6,7 @@ export class MyRockSet extends CGFobject {
     super(scene);
     this.terrain = terrain;
     this.rocks = [];
+    this.pathClearance = 15; // rocks need clearance from path and barn
 
     // Setup an appearance for the rocks (greyish dry stone)
     this.rockMaterial = new CGFappearance(this.scene);
@@ -30,11 +31,14 @@ export class MyRockSet extends CGFobject {
         z = Math.sin(angle) * radius;
         attempts++;
         if (attempts > maxAttempts) break;
-      } while (positions.some(p => {
-        const dx = p.x - x;
-        const dz = p.z - z;
-        return dx*dx + dz*dz < minSpacing*minSpacing;
-      }));
+      } while (
+        positions.some(p => {
+          const dx = p.x - x;
+          const dz = p.z - z;
+          return dx*dx + dz*dz < minSpacing*minSpacing;
+        }) ||
+        (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(x, z, this.pathClearance))
+      );
 
       positions.push({x, z});
         

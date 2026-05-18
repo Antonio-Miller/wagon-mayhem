@@ -6,6 +6,7 @@ export class MyPineTreeSet extends CGFobject {
     super(scene);
     this.terrain = terrain;
     this.trees = [];
+    this.pathClearance = 20; // trees need larger clearance from path and barn
 
     // generate scattered positions with minimum spacing to avoid clustering
     const positions = [];
@@ -22,11 +23,14 @@ export class MyPineTreeSet extends CGFobject {
         z = Math.sin(angle) * radius;
         attempts++;
         if (attempts > maxAttempts) break;
-      } while (positions.some(p => {
-        const dx = p.x - x;
-        const dz = p.z - z;
-        return dx*dx + dz*dz < minSpacing*minSpacing;
-      }));
+      } while (
+        positions.some(p => {
+          const dx = p.x - x;
+          const dz = p.z - z;
+          return dx*dx + dz*dz < minSpacing*minSpacing;
+        }) ||
+        (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(x, z, this.pathClearance))
+      );
 
       positions.push({x,z});
 

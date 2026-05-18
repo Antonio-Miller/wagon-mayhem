@@ -275,6 +275,56 @@ export class MyTerrain {
     return false;
   }
 
+  isPointInPathRing(worldX, worldZ, margin = 0) {
+    if (!this.pathEnabled) {
+      return false;
+    }
+
+    // Distance from center (0, 0)
+    const dx = worldX;
+    const dz = worldZ;
+    const distSq = dx * dx + dz * dz;
+    
+    const innerRadius = this.pathRadius - this.pathHalfWidth - margin;
+    const outerRadius = this.pathRadius + this.pathHalfWidth + margin;
+    
+    const innerRadiusSq = innerRadius * innerRadius;
+    const outerRadiusSq = outerRadius * outerRadius;
+    
+    // Point is forbidden if it's within the ring (between inner and outer)
+    return distSq >= innerRadiusSq && distSq <= outerRadiusSq;
+  }
+
+  isPointInBarnArea(worldX, worldZ, margin = 0) {
+    if (!this.circularAreaEnabled) {
+      return false;
+    }
+
+    const dx = worldX - this.pathCenterX;
+    const dz = worldZ - this.pathCenterZ;
+    const distSq = dx * dx + dz * dz;
+    
+    const radius = this.circularAreaRadius + margin;
+    const radiusSq = radius * radius;
+    
+    // Point is forbidden if it's within the circle
+    return distSq <= radiusSq;
+  }
+
+  isPointForbidden(worldX, worldZ, margin = 0) {
+    // Check if point is in forbidden path ring
+    if (this.isPointInPathRing(worldX, worldZ, margin)) {
+      return true;
+    }
+    
+    // Check if point is in forbidden barn area
+    if (this.isPointInBarnArea(worldX, worldZ, margin)) {
+      return true;
+    }
+    
+    return false;
+  }
+
   ensureHeightmapPixels() {
     if (this.heightmapPixels || !this.heightmap || this.heightmap.texID === -1) {
       return;
