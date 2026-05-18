@@ -40,16 +40,60 @@ export class MyTerrain {
     this.shader.setUniformsValues({
       uHeightmap: 0,
       uTerrainTexture: 1,
+      uPathBlendMap: 2,
       uMaxHeight: this.maxHeight,
       uTerrainStep: this.size / this.divisions,
       uTexelStep: 1.0 / this.divisions,
       uTileScale: 1.0,
+      uPathColor: [0.72, 0.54, 0.36],
+      uPathBlend: 0.92,
     });
 
     this.pathCorners = null;
     this.pathHalfWidth = 0.0;
+    this.pathRadius = 200.0;
     this.pathColor = [0.72, 0.54, 0.36];
     this.pathBlend = 0.92;
+    this.pathBlendMap = null;
+  }
+
+  generatePathBlendMap(corners, halfWidth) {
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Background: black (no path)
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, size, size);
+
+    // Center of terrain in canvas space
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    // Convert world units to canvas pixels.
+    const worldToPixels = size / this.size;
+    const ringRadiusPixels = this.pathRadius * worldToPixels;
+    const ringWidthPixels = (halfWidth * 2) * worldToPixels;
+
+    // Draw circular path as a white stroke
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = ringWidthPixels;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, ringRadiusPixels, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Optional: Apply slight blur for softer edges
+    ctx.filter = 'blur(2px)';
+    ctx.drawImage(canvas, 0, 0);
+
+    // Create texture from canvas
+    const texture = new CGFtexture(this.scene, canvas.toDataURL());
+    return texture;
   }
 
   setPathUniforms(corners, halfWidth, color, blend) {
@@ -62,27 +106,14 @@ export class MyTerrain {
       return;
     }
 
-    const gl = this.scene.gl;
-    const program = this.shader && this.shader.program;
-    if (!program) {
-      return;
-    }
+    // Generate the path blend map from corners
+    this.pathBlendMap = this.generatePathBlendMap(this.pathCorners, this.pathHalfWidth);
 
-    const prevProgram = gl.getParameter(gl.CURRENT_PROGRAM);
-    gl.useProgram(program);
-
-    const cornersLoc = gl.getUniformLocation(program, "uPathCorners");
-    if (cornersLoc) {
-      gl.uniform2fv(cornersLoc, this.pathCorners);
-    }
-
+    // Update shader uniforms
     this.shader.setUniformsValues({
-      uPathHalfWidth: this.pathHalfWidth,
       uPathColor: this.pathColor,
       uPathBlend: this.pathBlend,
     });
-
-    gl.useProgram(prevProgram);
   }
 
   ensureHeightmapPixels() {
@@ -160,30 +191,25 @@ export class MyTerrain {
     this.shader.setUniformsValues({
       uHeightmap: 0,
       uTerrainTexture: 1,
+      uPathBlendMap: 2,
       uMaxHeight: this.maxHeight,
       uTerrainStep: this.size / this.divisions,
       uTexelStep: 1.0 / this.divisions,
       uTileScale: 1.0,
+      uPathColor: this.pathColor,
+      uPathBlend: this.pathBlend,
     });
-
-    if (this.pathCorners && this.pathCorners.length === 8) {
-      this.shader.setUniformsValues({
-        uPathHalfWidth: this.pathHalfWidth,
-        uPathColor: this.pathColor,
-        uPathBlend: this.pathBlend,
-      });
-
-      const gl = this.scene.gl;
-      const cornersLoc = gl.getUniformLocation(this.shader.program, "uPathCorners");
-      if (cornersLoc) {
-        gl.uniform2fv(cornersLoc, this.pathCorners);
-      }
-    }
 
     this.appearance.apply();
     this.heightmap.bind(0);
     this.terrainTexture.bind(1);
+    if (this.pathBlendMap) {
+      this.pathBlendMap.bind(2);
+    }
     this.plane.display();
+    if (this.pathBlendMap) {
+      this.pathBlendMap.unbind(2);
+    }
     this.terrainTexture.unbind(1);
     this.heightmap.unbind(0);
 

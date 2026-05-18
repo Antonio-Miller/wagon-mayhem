@@ -39,7 +39,7 @@ export class MyScene extends CGFscene {
 
     const halfW = 110;
     const halfD = 70;
-    const pathWidth = 10;
+    const pathWidth = 30;
     const pathCorners = [
       -halfW, -halfD,
       halfW, -halfD,
@@ -48,6 +48,9 @@ export class MyScene extends CGFscene {
     ];
     this.terrain.setPathUniforms(pathCorners, pathWidth / 2, [0.72, 0.54, 0.36], 0.92);
     this.lastUpdateTime = 0;
+    this.cameraDebugEnabled = true;
+    this.cameraDebugIntervalMs = 500;
+    this.lastCameraDebugLogTime = 0;
 
     this.setUpdatePeriod(16);
 
@@ -156,6 +159,14 @@ export class MyScene extends CGFscene {
     const deltaTime = (t - this.lastUpdateTime) / 1000;
     this.lastUpdateTime = t;
     this.clouds.update(deltaTime);
+
+    if (this.cameraDebugEnabled && t - this.lastCameraDebugLogTime >= this.cameraDebugIntervalMs) {
+      const pos = this.camera.position;
+      console.log(
+        `[Camera] x=${pos[0].toFixed(2)} y=${pos[1].toFixed(2)} z=${pos[2].toFixed(2)}`
+      );
+      this.lastCameraDebugLogTime = t;
+    }
   }
 
   display() {
