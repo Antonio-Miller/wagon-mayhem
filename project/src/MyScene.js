@@ -47,6 +47,18 @@ export class MyScene extends CGFscene {
       -halfW, halfD,
     ];
     this.terrain.setPathUniforms(pathCorners, pathWidth / 2, [0.72, 0.54, 0.36], 0.92);
+
+    const barnAreaCenterX = 112.65;
+    const barnAreaCenterZ = -220.85;
+    const barnAreaRadius = 90;
+    this.terrain.setCircularArea(
+      barnAreaCenterX,
+      barnAreaCenterZ,
+      barnAreaRadius,
+      [0.72, 0.54, 0.36],
+      0.92,
+      10.0
+    );
     this.lastUpdateTime = 0;
     this.cameraDebugEnabled = true;
     this.cameraDebugIntervalMs = 500;

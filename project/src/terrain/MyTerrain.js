@@ -52,9 +52,111 @@ export class MyTerrain {
     this.pathCorners = null;
     this.pathHalfWidth = 0.0;
     this.pathRadius = 200.0;
+    this.pathCenterX = 0.0;
+    this.pathCenterZ = 0.0;
+    this.pathEnabled = false;
+    this.circularAreaEnabled = false;
+    this.circularAreaRadius = 0.0;
+    this.circularAreaEdgeSoftness = 8.0;
     this.pathColor = [0.72, 0.54, 0.36];
     this.pathBlend = 0.92;
     this.pathBlendMap = null;
+  }
+
+  worldToBlendMap(x, z, size) {
+    const px = ((x + this.halfSize) / this.size) * size;
+    const py = ((this.halfSize - z) / this.size) * size;
+    return [px, py];
+  }
+
+  generateCircularAreaBlendMap(centerX, centerZ, radius, edgeSoftness = 8.0) {
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, size, size);
+
+    const worldToPixels = size / this.size;
+    const [centerPx, centerPy] = this.worldToBlendMap(centerX, centerZ, size);
+    const radiusPixels = Math.max(0, radius * worldToPixels);
+    const softnessPixels = Math.max(0, edgeSoftness * worldToPixels);
+    const innerRadius = Math.max(0, radiusPixels - softnessPixels);
+    const outerRadius = radiusPixels + softnessPixels;
+
+    const gradient = ctx.createRadialGradient(
+      centerPx,
+      centerPy,
+      innerRadius,
+      centerPx,
+      centerPy,
+      outerRadius
+    );
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(centerPx, centerPy, outerRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    return new CGFtexture(this.scene, canvas.toDataURL());
+  }
+
+  rebuildPathBlendMap() {
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, size, size);
+
+    const worldToPixels = size / this.size;
+
+    if (this.pathEnabled) {
+      const centerX = size / 2;
+      const centerY = size / 2;
+      const ringRadiusPixels = this.pathRadius * worldToPixels;
+      const ringWidthPixels = (this.pathHalfWidth * 2) * worldToPixels;
+
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = ringWidthPixels;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, ringRadiusPixels, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    if (this.circularAreaEnabled) {
+      const [centerPx, centerPy] = this.worldToBlendMap(this.pathCenterX, this.pathCenterZ, size);
+      const radiusPixels = Math.max(0, this.circularAreaRadius * worldToPixels);
+      const softnessPixels = Math.max(0, this.circularAreaEdgeSoftness * worldToPixels);
+      const innerRadius = Math.max(0, radiusPixels - softnessPixels);
+      const outerRadius = radiusPixels + softnessPixels;
+
+      const gradient = ctx.createRadialGradient(
+        centerPx,
+        centerPy,
+        innerRadius,
+        centerPx,
+        centerPy,
+        outerRadius
+      );
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(centerPx, centerPy, outerRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    this.pathBlendMap = new CGFtexture(this.scene, canvas.toDataURL());
   }
 
   generatePathBlendMap(corners, halfWidth) {
@@ -101,15 +203,33 @@ export class MyTerrain {
     this.pathHalfWidth = halfWidth;
     this.pathColor = color ?? this.pathColor;
     this.pathBlend = blend ?? this.pathBlend;
+    this.pathEnabled = true;
 
     if (!this.pathCorners || this.pathCorners.length !== 8) {
       return;
     }
 
-    // Generate the path blend map from corners
-    this.pathBlendMap = this.generatePathBlendMap(this.pathCorners, this.pathHalfWidth);
+    // Rebuild blend map combining all enabled path/area masks.
+    this.rebuildPathBlendMap();
 
     // Update shader uniforms
+    this.shader.setUniformsValues({
+      uPathColor: this.pathColor,
+      uPathBlend: this.pathBlend,
+    });
+  }
+
+  setCircularArea(centerX, centerZ, radius, color, blend, edgeSoftness = 8.0) {
+    this.pathCenterX = centerX;
+    this.pathCenterZ = centerZ;
+    this.circularAreaRadius = radius;
+    this.circularAreaEdgeSoftness = edgeSoftness;
+    this.circularAreaEnabled = true;
+    this.pathColor = color ?? this.pathColor;
+    this.pathBlend = blend ?? this.pathBlend;
+
+    this.rebuildPathBlendMap();
+
     this.shader.setUniformsValues({
       uPathColor: this.pathColor,
       uPathBlend: this.pathBlend,
