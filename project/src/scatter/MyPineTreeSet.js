@@ -1,5 +1,5 @@
 import { CGFobject } from "../../../lib/CGF.js";
-import { MyPineTree } from "./MyPineTree.js";
+import { MyPineTree } from "../entities/MyPineTree.js";
 
 export class MyPineTreeSet extends CGFobject {
   constructor(scene, amount, terrain) {

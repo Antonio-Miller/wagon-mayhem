@@ -3,9 +3,9 @@ import { MyFirstPersonCamera } from "./MyFirstPersonCamera.js";
 import { MySky } from "./environment/MySky.js";
 import { MyClouds } from "./environment/MyClouds.js";
 import { MyTerrain } from "./terrain/MyTerrain.js";
-import { MyRockSet } from "./environment/MyRockSet.js";
-import { MyPineTreeSet } from "./environment/MyPineTreeSet.js";
-import { MyGrass } from "./environment/MyGrass.js";
+import { MyRockSet } from "./scatter/MyRockSet.js";
+import { MyPineTreeSet } from "./scatter/MyPineTreeSet.js";
+import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
 
 /**
