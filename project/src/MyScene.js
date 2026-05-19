@@ -7,6 +7,7 @@ import { MyRockSet } from "./scatter/MyRockSet.js";
 import { MyPineTreeSet } from "./scatter/MyPineTreeSet.js";
 import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
+import { MyBarn } from "./entities/MyBarn.js";
 
 /**
  * MyScene
@@ -59,6 +60,8 @@ export class MyScene extends CGFscene {
       0.92,
       10.0
     );
+
+    this.barn = new MyBarn(this, this.terrain, barnAreaCenterX, barnAreaCenterZ, 50, 30, 20, 60);
 
     this.grass = new MyGrass(this, this.terrain);
     this.rocks = new MyRockSet(this, 50, this.terrain);
@@ -206,7 +209,7 @@ export class MyScene extends CGFscene {
     
     // Constrain camera to stay within dome and above terrain
     this.constrainCameraToDome();
-    this.constrainCameraAboveTerrain();
+    //this.constrainCameraAboveTerrain();
     this.constrainCameraToObjects();
     
     // Apply transformations corresponding to the camera position relative to the origin
@@ -235,6 +238,9 @@ export class MyScene extends CGFscene {
     this.sky.display();
     this.clouds.display();
     this.terrain.display();
+    
+    this.barn.display();
+    
     this.grass.display();
     this.flowers.display();
     
