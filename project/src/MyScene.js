@@ -8,6 +8,7 @@ import { MyPineTreeSet } from "./scatter/MyPineTreeSet.js";
 import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
 import { MyBarn } from "./entities/MyBarn.js";
+import { MyBarnFence } from "./entities/MyBarnFence.js";
 
 /**
  * MyScene
@@ -62,6 +63,20 @@ export class MyScene extends CGFscene {
     );
 
     this.barn = new MyBarn(this, this.terrain, barnAreaCenterX, barnAreaCenterZ, 50, 52, 28, 50);
+
+    // Create barn fence - fully closed
+    const fenceOpenings = [];
+    this.barnFence = new MyBarnFence(
+      this,
+      this.terrain,
+      barnAreaCenterX,
+      barnAreaCenterZ,
+      barnAreaRadius,
+      0.35, // post radius (thinner)
+      4.2,  // post height
+      6.5,  // post spacing
+      fenceOpenings
+    );
 
     this.grass = new MyGrass(this, this.terrain);
     this.rocks = new MyRockSet(this, 50, this.terrain);
@@ -118,7 +133,7 @@ export class MyScene extends CGFscene {
       0.4,
       0.1,
       1000,
-      vec3.fromValues(200, 200, 200),
+      vec3.fromValues(116.22, 54.88, -175.48),
       vec3.fromValues(0, 0, 0)
     );
     this.domeRadius = 295; // Keep camera within dome (radius 200 with margin)
@@ -209,7 +224,7 @@ export class MyScene extends CGFscene {
     
     // Constrain camera to stay within dome and above terrain
     this.constrainCameraToDome();
-    this.constrainCameraAboveTerrain();
+    //this.constrainCameraAboveTerrain();
     this.constrainCameraToObjects();
     
     // Apply transformations corresponding to the camera position relative to the origin
@@ -240,6 +255,7 @@ export class MyScene extends CGFscene {
     this.terrain.display();
     
     this.barn.display();
+    this.barnFence.display();
     
     this.grass.display();
     this.flowers.display();

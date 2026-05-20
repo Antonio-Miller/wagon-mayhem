@@ -1,12 +1,13 @@
 import { CGFobject } from "../../../lib/CGF.js";
 
 export class MyCilinder extends CGFobject {
-  constructor(scene, slices = 32, stacks = 1, radius = 1, height = 1) {
+  constructor(scene, slices = 32, stacks = 1, radius = 1, height = 1, hasCaps = true) {
     super(scene);
     this.slices = slices;
     this.stacks = stacks;
     this.radius = radius;
     this.height = height;
+    this.hasCaps = hasCaps;
     this.initBuffers();
   }
 
@@ -42,6 +43,52 @@ export class MyCilinder extends CGFobject {
 
         this.indices.push(first, second, first + 1);
         this.indices.push(second, second + 1, first + 1);
+      }
+    }
+
+    if (this.hasCaps) {
+      const bottomCenterIndex = this.vertices.length / 3;
+      this.vertices.push(0, 0, 0);
+      this.normals.push(0, -1, 0);
+      this.texCoords.push(0.5, 0.5);
+
+      for (let j = 0; j <= this.slices; j++) {
+        const u = j / this.slices;
+        const angle = j * alpha;
+        const x = this.radius * Math.cos(angle);
+        const z = this.radius * Math.sin(angle);
+        this.vertices.push(x, 0, z);
+        this.normals.push(0, -1, 0);
+        this.texCoords.push(0.5 + (x / (2 * this.radius)), 0.5 + (z / (2 * this.radius)));
+      }
+
+      for (let j = 0; j < this.slices; j++) {
+        const first = bottomCenterIndex + j + 1;
+        const second = bottomCenterIndex + j + 2;
+        this.indices.push(bottomCenterIndex, first, second);
+        this.indices.push(bottomCenterIndex, second, first);
+      }
+
+      const topCenterIndex = this.vertices.length / 3;
+      this.vertices.push(0, this.height, 0);
+      this.normals.push(0, 1, 0);
+      this.texCoords.push(0.5, 0.5);
+
+      for (let j = 0; j <= this.slices; j++) {
+        const u = j / this.slices;
+        const angle = j * alpha;
+        const x = this.radius * Math.cos(angle);
+        const z = this.radius * Math.sin(angle);
+        this.vertices.push(x, this.height, z);
+        this.normals.push(0, 1, 0);
+        this.texCoords.push(0.5 + (x / (2 * this.radius)), 0.5 + (z / (2 * this.radius)));
+      }
+
+      for (let j = 0; j < this.slices; j++) {
+        const first = topCenterIndex + j + 1;
+        const second = topCenterIndex + j + 2;
+        this.indices.push(topCenterIndex, first, second);
+        this.indices.push(topCenterIndex, second, first);
       }
     }
 
