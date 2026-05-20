@@ -85,7 +85,9 @@ export class MyBarnFence extends CGFobject {
           continue;
         }
         
-        posts.push({ x, z, angle, index: i });
+        // store tangent (angle + 90deg) so posts/rails can align tangent to circle
+        const tangent = angle + Math.PI / 2;
+        posts.push({ x, z, angle, tangent, index: i });
       }
     }
 
@@ -100,6 +102,22 @@ export class MyBarnFence extends CGFobject {
     return 0;
   }
 
+  constrainCamera(cameraPosition) {
+    for (const post of this.fencePosts) {
+      const dx = cameraPosition[0] - post.x;
+      const dz = cameraPosition[2] - post.z;
+      const distanceSquared = dx * dx + dz * dz;
+      const radius = this.postRadius + this.baseHeight + this.pathClearance;
+
+      if (distanceSquared > 0 && distanceSquared < radius * radius) {
+        const distance = Math.sqrt(distanceSquared);
+        const scale = radius / distance;
+        cameraPosition[0] = post.x + dx * scale;
+        cameraPosition[2] = post.z + dz * scale;
+      }
+    }
+  }
+
   display() {
 
     this.postAppearance.apply();
@@ -110,9 +128,11 @@ export class MyBarnFence extends CGFobject {
       
       const terrainHeight = this.getTerrainHeight(post.x, post.z);
 
-      // Draw vertical post with base
+      // Draw vertical post with base, rotated so the post's local X aligns
+      // with the tangent direction (keeps rails and posts consistently tangent).
       this.scene.pushMatrix();
       this.scene.translate(post.x, terrainHeight, post.z);
+      if (typeof post.tangent === 'number') this.scene.rotate(-post.tangent, 0, 1, 0);
 
       // Draw post base at ground level
       this.basePrimitive.display();
@@ -139,15 +159,17 @@ export class MyBarnFence extends CGFobject {
         (nextPost.x - post.x) ** 2 + (nextPost.z - post.z) ** 2
       );
 
-      const angleToNext = Math.atan2(nextPost.z - post.z, nextPost.x - post.x);
-      
+      // Use this post's tangent so the rail is perpendicular to the radius
+      // from the barn center to the pole position.
+      const tangentAngle = post.tangent + 0.086;
+
       const avgTerrainHeight = (terrainHeight + nextTerrainHeight) / 2;
 
       // Draw lower horizontal rail
       const lowerRailHeight = avgTerrainHeight + this.baseHeight + this.postHeight * 0.55;
       this.scene.pushMatrix();
       this.scene.translate(midX, lowerRailHeight, midZ);
-      this.scene.rotate(-angleToNext, 0, 1, 0);
+      this.scene.rotate(-tangentAngle, 0, 1, 0);
       this.scene.rotate(-Math.PI / 2, 0, 0, 1);
       this.scene.scale(1, distance, 1);
       this.horizontalConnector.display();
@@ -157,7 +179,7 @@ export class MyBarnFence extends CGFobject {
       const upperRailHeight = avgTerrainHeight + this.baseHeight + this.postHeight * 0.86;
       this.scene.pushMatrix();
       this.scene.translate(midX, upperRailHeight, midZ);
-      this.scene.rotate(-angleToNext, 0, 1, 0);
+      this.scene.rotate(-tangentAngle, 0, 1, 0);
       this.scene.rotate(-Math.PI / 2, 0, 0, 1);
       this.scene.scale(1, distance, 1);
       this.horizontalConnector.display();

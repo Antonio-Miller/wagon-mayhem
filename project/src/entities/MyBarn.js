@@ -86,4 +86,33 @@ export class MyBarn extends CGFobject {
     this.scene.popMatrix();
     this.scene.enableTextures(previousTexturesEnabled);
   }
+
+  constrainCamera(cameraPosition) {
+    const halfWidth = this.width / 2;
+    const halfDepth = this.depth / 2;
+    const padding = Math.max(this.width, this.depth) * 0.08;
+    const minX = this.positionX - halfWidth - padding;
+    const maxX = this.positionX + halfWidth + padding;
+    const minZ = this.positionZ - halfDepth - padding;
+    const maxZ = this.positionZ + halfDepth + padding;
+
+    if (
+      cameraPosition[0] >= minX &&
+      cameraPosition[0] <= maxX &&
+      cameraPosition[2] >= minZ &&
+      cameraPosition[2] <= maxZ
+    ) {
+      const distLeft = cameraPosition[0] - minX;
+      const distRight = maxX - cameraPosition[0];
+      const distFront = cameraPosition[2] - minZ;
+      const distBack = maxZ - cameraPosition[2];
+
+      const minDist = Math.min(distLeft, distRight, distFront, distBack);
+
+      if (minDist === distLeft) cameraPosition[0] = minX;
+      else if (minDist === distRight) cameraPosition[0] = maxX;
+      else if (minDist === distFront) cameraPosition[2] = minZ;
+      else cameraPosition[2] = maxZ;
+    }
+  }
 }

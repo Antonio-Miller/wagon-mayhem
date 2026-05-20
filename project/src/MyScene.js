@@ -53,7 +53,7 @@ export class MyScene extends CGFscene {
     const barnAreaCenterX = 112.65;
     const barnAreaCenterZ = -220.85;
     const barnAreaRadius = 90;
-    const barnFenceRadius = 80
+    const barnFenceRadius = 75;
     this.terrain.setCircularArea(
       barnAreaCenterX,
       barnAreaCenterZ,
@@ -184,6 +184,14 @@ export class MyScene extends CGFscene {
     if (this.pineTrees) {
       this.pineTrees.constrainCamera(pos);
     }
+
+    if (this.barn) {
+      this.barn.constrainCamera(pos);
+    }
+
+    if (this.barnFence) {
+      this.barnFence.constrainCamera(pos);
+    }
   }
 
   update(t) {
@@ -225,7 +233,7 @@ export class MyScene extends CGFscene {
     
     // Constrain camera to stay within dome and above terrain
     this.constrainCameraToDome();
-    //this.constrainCameraAboveTerrain();
+    this.constrainCameraAboveTerrain();
     this.constrainCameraToObjects();
     
     // Apply transformations corresponding to the camera position relative to the origin
