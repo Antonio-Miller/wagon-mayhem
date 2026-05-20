@@ -7,7 +7,7 @@ export class MyBarnFence extends CGFobject {
     terrain,
     centerX = 0,
     centerZ = 0,
-    fenceRadius = 130,
+    fenceRadius = 10,
     postRadius = 0.35,
     postHeight = 4.2,
     postSpacing = 6.5,

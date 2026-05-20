@@ -53,6 +53,7 @@ export class MyScene extends CGFscene {
     const barnAreaCenterX = 112.65;
     const barnAreaCenterZ = -220.85;
     const barnAreaRadius = 90;
+    const barnFenceRadius = 80
     this.terrain.setCircularArea(
       barnAreaCenterX,
       barnAreaCenterZ,
@@ -71,7 +72,7 @@ export class MyScene extends CGFscene {
       this.terrain,
       barnAreaCenterX,
       barnAreaCenterZ,
-      barnAreaRadius,
+      barnFenceRadius,
       0.35, // post radius (thinner)
       4.2,  // post height
       6.5,  // post spacing

@@ -43,6 +43,10 @@ uniform sampler2D uTerrainTexture;
 uniform float uMaxHeight;
 uniform float uTerrainDiameter;
 uniform float uTexelStep;
+uniform vec2 uCircularAreaCenter;
+uniform float uCircularAreaRadius;
+uniform float uCircularAreaSoftness;
+uniform float uCircularAreaHeight;
 
 out vec4 vFinalColor;
 out vec2 vTextureCoord;
@@ -101,17 +105,49 @@ float sampleHeight(vec2 uv) {
     return texture(uHeightmap, clamp(uv, vec2(0.0), vec2(1.0))).r * uMaxHeight;
 }
 
+float circularAreaBlend(vec2 worldXZ) {
+    if (uCircularAreaRadius <= 0.0) {
+        return 0.0;
+    }
+
+    float dist = distance(worldXZ, uCircularAreaCenter);
+    float innerRadius = max(0.0, uCircularAreaRadius - uCircularAreaSoftness);
+    float outerRadius = uCircularAreaRadius + uCircularAreaSoftness;
+
+    if (outerRadius <= innerRadius) {
+        return dist <= outerRadius ? 1.0 : 0.0;
+    }
+
+    if (dist <= innerRadius) {
+        return 1.0;
+    }
+
+    if (dist >= outerRadius) {
+        return 0.0;
+    }
+
+    float t = (dist - innerRadius) / (outerRadius - innerRadius);
+    return 1.0 - (t * t * (3.0 - 2.0 * t));
+}
+
+float sampleHeight(vec2 uv, vec2 worldXZ) {
+    float terrainHeight = sampleHeight(uv);
+    float blend = circularAreaBlend(worldXZ);
+    return mix(terrainHeight, uCircularAreaHeight, blend);
+}
+
 void main() {
     vec2 uv = aTextureCoord;
-    float height = sampleHeight(uv);
+    vec2 worldXZ = vec2(aVertexPosition.x, aVertexPosition.z);
+    float worldStep = uTexelStep * uTerrainDiameter;
+    float height = sampleHeight(uv, worldXZ);
 
-    float heightLeft = sampleHeight(uv - vec2(uTexelStep, 0.0));
-    float heightRight = sampleHeight(uv + vec2(uTexelStep, 0.0));
-    float heightDown = sampleHeight(uv - vec2(0.0, uTexelStep));
-    float heightUp = sampleHeight(uv + vec2(0.0, uTexelStep));
+    float heightLeft = sampleHeight(uv - vec2(uTexelStep, 0.0), worldXZ - vec2(worldStep, 0.0));
+    float heightRight = sampleHeight(uv + vec2(uTexelStep, 0.0), worldXZ + vec2(worldStep, 0.0));
+    float heightDown = sampleHeight(uv - vec2(0.0, uTexelStep), worldXZ - vec2(0.0, worldStep));
+    float heightUp = sampleHeight(uv + vec2(0.0, uTexelStep), worldXZ + vec2(0.0, worldStep));
 
     vec3 displacedPosition = vec3(aVertexPosition.x, height, aVertexPosition.z);
-    float worldStep = uTexelStep * uTerrainDiameter;
     vec3 tangentX = vec3(worldStep * 2.0, heightRight - heightLeft, 0.0);
     vec3 tangentZ = vec3(0.0, heightUp - heightDown, worldStep * 2.0);
     vec3 normal = normalize(cross(tangentZ, tangentX));
@@ -125,5 +161,5 @@ void main() {
     vHeight = height;
 
     vTextureCoord = uv;
-    vWorldXZ = vec2(aVertexPosition.x, aVertexPosition.z);
+    vWorldXZ = worldXZ;
 }
