@@ -12,7 +12,7 @@ export class MyInterface extends CGFinterface {
     init(application) {
         // call CGFinterface init
         super.init(application);
-        // Make the scene's camera the interface active camera (first-person)
+        // Make the scene's camera the interface active camera.
         if (this.scene && this.scene.camera) this.setActiveCamera(this.scene.camera);
         
         // init GUI. For more information on the methods, check:
@@ -24,27 +24,33 @@ export class MyInterface extends CGFinterface {
         this.gui.add(this.scene, 'sunEnabled').name('Sun On');
         this.gui.add(this.scene, 'timeOfDay', 0, 24).name('Time of Day').step(0.5);
 
-        // Ensure only WASD keys are forwarded to the scene/interface key handlers
-        // so browser shortcuts (Ctrl/Shift/F12, etc.) are not intercepted.
+        // Forward player controls to the scene. The active camera is passive,
+        // so mouse input no longer changes gameplay state.
         const self = this;
         document.onkeydown = function(ev) {
-            const k = (ev && ev.key) ? ev.key.toLowerCase() : '';
-            if (['w','a','s','d'].indexOf(k) !== -1) {
-                console.log('MyInterface: WASD keydown', k);
-                self.processKeyDown(ev);
-                if (self.activeCamera && typeof self.activeCamera.onKeyDown === 'function') {
-                    try { console.log('MyInterface: forwarding keydown to activeCamera', k); self.activeCamera.onKeyDown(ev); } catch (e) { console.error(e); }
+            const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
+            const code = ev && ev.code ? ev.code : '';
+            // Player movement keys + camera mode (Shift) handling
+            if (['w','a','s','d'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
+                if (self.scene && typeof self.scene.handleControlKeyDown === 'function') {
+                    self.scene.handleControlKeyDown(ev);
                 }
+                ev.preventDefault();
+            } else if (code === 'ShiftLeft' || code === 'ShiftRight' || key === 'shift') {
+                if (self.scene && typeof self.scene.cycleCameraMode === 'function') {
+                    self.scene.cycleCameraMode();
+                }
+                ev.preventDefault();
             }
         };
         document.onkeyup = function(ev) {
-            const k = (ev && ev.key) ? ev.key.toLowerCase() : '';
-            if (['w','a','s','d'].indexOf(k) !== -1) {
-                console.log('MyInterface: WASD keyup', k);
-                self.processKeyUp(ev);
-                if (self.activeCamera && typeof self.activeCamera.onKeyUp === 'function') {
-                    try { console.log('MyInterface: forwarding keyup to activeCamera', k); self.activeCamera.onKeyUp(ev); } catch (e) { console.error(e); }
+            const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
+            const code = ev && ev.code ? ev.code : '';
+            if (['w','a','s','d'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
+                if (self.scene && typeof self.scene.handleControlKeyUp === 'function') {
+                    self.scene.handleControlKeyUp(ev);
                 }
+                ev.preventDefault();
             }
         };
 
