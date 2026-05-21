@@ -87,7 +87,7 @@ export class MyBarnFence extends CGFobject {
         
         // store tangent (angle + 90deg) so posts/rails can align tangent to circle
         const tangent = angle + Math.PI / 2;
-        posts.push({ x, z, angle, tangent, index: i });
+        posts.push({ x, y: undefined, z, angle, tangent, index: i });
       }
     }
 
@@ -125,8 +125,11 @@ export class MyBarnFence extends CGFobject {
     for (let i = 0; i < this.fencePosts.length; i++) {
       const post = this.fencePosts[i];
 
-      
-      const terrainHeight = this.getTerrainHeight(post.x, post.z);
+      if (post.y === undefined) {
+        post.y = this.getTerrainHeight(post.x, post.z);
+      }
+
+      const terrainHeight = post.y;
 
       // Draw vertical post with base, rotated so the post's local X aligns
       // with the tangent direction (keeps rails and posts consistently tangent).

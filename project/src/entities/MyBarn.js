@@ -14,6 +14,7 @@ export class MyBarn extends CGFobject {
     this.roofHeight = roofHeight;
     this.depth = depth;
     this.groundSink = 3;
+    this.positionY = null;
 
     this.lowerBodyHeight = bodyHeight * 0.36;
     this.middleBodyHeight = bodyHeight * 0.34;
@@ -53,8 +54,12 @@ export class MyBarn extends CGFobject {
   }
 
   display() {
-    const positionY = this.terrain ? this.terrain.getHeightAt(this.positionX, this.positionZ) : 0;
-    const baseY = positionY - this.groundSink - 10;
+    if (this.positionY === null) {
+      const positionY = this.terrain ? this.terrain.getHeightAt(this.positionX, this.positionZ) : 0;
+      this.positionY = positionY - this.groundSink - 10;
+    }
+
+    const baseY = this.positionY;
     const lowerCenterY = this.lowerBodyHeight / 2;
     const middleCenterY = this.lowerBodyHeight + this.middleBodyHeight / 2;
     const upperCenterY = this.lowerBodyHeight + this.middleBodyHeight + this.upperBodyHeight / 2;

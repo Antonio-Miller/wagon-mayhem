@@ -9,6 +9,7 @@ import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
 import { MyBarn } from "./entities/MyBarn.js";
 import { MyBarnFence } from "./entities/MyBarnFence.js";
+import { MyPhysicsEngine } from "./physics/MyPhysicsEngine.js";
 
 /**
  * MyScene
@@ -83,6 +84,11 @@ export class MyScene extends CGFscene {
     this.rocks = new MyRockSet(this, 50, this.terrain);
     this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
     this.flowers = new MyFlowerSet(this, 80, this.terrain, this.rocks, this.pineTrees);
+    this.physics = new MyPhysicsEngine(this, {
+      gravity: -24.0,
+      terminalVelocity: -90.0,
+    });
+    this.registerPhysicsBodies();
     this.lastUpdateTime = 0;
     this.cameraDebugEnabled = true;
     this.cameraDebugIntervalMs = 500;
@@ -174,6 +180,130 @@ export class MyScene extends CGFscene {
     }
   }
 
+  getCameraGroundHeight() {
+    if (this.terrain) {
+      return this.terrain.getHeightAt(this.camera.position[0], this.camera.position[2]) + 5;
+    }
+
+    return this.terrainMinHeight;
+  }
+
+  registerPhysicsBodies() {
+    if (!this.physics) {
+      return;
+    }
+
+    this.physics.registerBody({
+      name: 'camera',
+      position: this.camera.position,
+      velocity: vec3.fromValues(0, 0, 0),
+      gravityScale: 1,
+      groundHeightFn: () => this.getCameraGroundHeight(),
+    });
+
+    const registerSet = (entries, getGroundHeight, syncY) => {
+      if (!Array.isArray(entries)) {
+        return;
+      }
+
+      for (const entry of entries) {
+        const body = this.physics.registerBody({
+          position: vec3.fromValues(entry.x, entry.y, entry.z),
+          velocity: vec3.fromValues(0, 0, 0),
+          gravityScale: 1,
+          groundHeightFn: () => getGroundHeight(entry),
+          beforeStep: () => {
+            if (entry.placed && typeof entry.y === 'number') {
+              body.position[1] = entry.y;
+            }
+          },
+          onStep: () => {
+            syncY(entry, body.position[1]);
+          },
+        });
+
+        syncY(entry, body.position[1]);
+      }
+    };
+
+    registerSet(
+      this.rocks?.rocks,
+      (rock) => {
+        if (this.terrain?.getHeightAt) {
+          return this.terrain.getHeightAt(rock.x, rock.z) - (rock.scaleY * 0.4);
+        }
+
+        return rock.y;
+      },
+      (rock, y) => {
+        rock.y = y;
+      }
+    );
+
+    registerSet(
+      this.pineTrees?.trees,
+      (tree) => {
+        if (this.terrain?.getHeightAt) {
+          return this.terrain.getHeightAt(tree.x, tree.z);
+        }
+
+        return tree.y;
+      },
+      (tree, y) => {
+        tree.y = y;
+      }
+    );
+
+    registerSet(
+      this.flowers?.flowers,
+      (flower) => {
+        if (this.terrain?.getHeightAt) {
+          return this.terrain.getHeightAt(flower.x, flower.z) + 0.02;
+        }
+
+        return flower.y;
+      },
+      (flower, y) => {
+        flower.y = y;
+      }
+    );
+
+    if (this.barn) {
+      this.physics.registerBody({
+        name: 'barn',
+        position: vec3.fromValues(this.barn.positionX, this.barn.positionY ?? 0, this.barn.positionZ),
+        velocity: vec3.fromValues(0, 0, 0),
+        gravityScale: 1,
+        groundHeightFn: () => {
+          if (this.terrain?.getHeightAt) {
+            return this.terrain.getHeightAt(this.barn.positionX, this.barn.positionZ) - this.barn.groundSink - 10;
+          }
+
+          return this.barn.positionY ?? 0;
+        },
+        onStep: (body) => {
+          this.barn.positionY = body.position[1];
+        },
+      });
+    }
+
+    if (this.barnFence?.fencePosts) {
+      for (const post of this.barnFence.fencePosts) {
+        const body = this.physics.registerBody({
+          position: vec3.fromValues(post.x, post.y ?? 0, post.z),
+          velocity: vec3.fromValues(0, 0, 0),
+          gravityScale: 1,
+          groundHeightFn: () => this.barnFence.getTerrainHeight(post.x, post.z),
+          onStep: () => {
+            post.y = body.position[1];
+          },
+        });
+
+        post.y = body.position[1];
+      }
+    }
+  }
+
   constrainCameraToObjects() {
     const pos = this.camera.position;
 
@@ -197,16 +327,9 @@ export class MyScene extends CGFscene {
   update(t) {
     this.time = t / 1000;
 
-    if (this.lastUpdateTime === 0) {
-      this.lastUpdateTime = t;
-      if (this.grass) {
-        this.grass.update(this.time);
-      }
-      return;
-    }
-
-    const deltaTime = (t - this.lastUpdateTime) / 1000;
+    const deltaTime = this.lastUpdateTime === 0 ? 0 : (t - this.lastUpdateTime) / 1000;
     this.lastUpdateTime = t;
+    this.physics?.step(deltaTime);
     this.clouds.update(deltaTime);
 
     if (this.grass) {
