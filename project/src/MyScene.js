@@ -7,6 +7,7 @@ import { MyRockSet } from "./scatter/MyRockSet.js";
 import { MyPineTreeSet } from "./scatter/MyPineTreeSet.js";
 import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
+import { MyWagon } from "./entities/MyWagon.js";
 
 /**
  * MyScene
@@ -64,6 +65,7 @@ export class MyScene extends CGFscene {
     this.rocks = new MyRockSet(this, 50, this.terrain);
     this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
     this.flowers = new MyFlowerSet(this, 80, this.terrain, this.rocks, this.pineTrees);
+    this.wagon = new MyWagon(this);
     this.lastUpdateTime = 0;
     this.cameraDebugEnabled = true;
     this.cameraDebugIntervalMs = 500;
@@ -71,9 +73,13 @@ export class MyScene extends CGFscene {
 
     this.setUpdatePeriod(16);
 
+    // Keyboard state — written by MyInterface, read by wagon.update()
+    this.keys = {};
+
     //Objects connected to MyInterface
     this.displayAxis = true;
     this.sunEnabled = true;
+    this.displayWagon = true;
   }
   computeSkyFromTime() {
     const t = this.timeOfDay % 24;
@@ -186,6 +192,12 @@ export class MyScene extends CGFscene {
       this.grass.update(this.time);
     }
 
+    // Wagon physics + snap to terrain
+    this.wagon.update(deltaTime, this.keys);
+    if (this.terrain) {
+      this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
+    }
+
     if (this.cameraDebugEnabled && t - this.lastCameraDebugLogTime >= this.cameraDebugIntervalMs) {
       const pos = this.camera.position;
       console.log(
@@ -237,7 +249,8 @@ export class MyScene extends CGFscene {
     this.terrain.display();
     this.grass.display();
     this.flowers.display();
-    
+
+    if (this.displayWagon) this.wagon.display();
 
     // ---- END Primitive drawing section
   }
