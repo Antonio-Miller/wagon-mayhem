@@ -8,7 +8,7 @@ export class MyThirdPersonCamera extends CGFcamera {
   constructor(fov, near, far, position, target) {
     super(fov, near, far, position, target);
     this.followDistance = 18;
-    this.followHeight = 7;
+    this.followHeight = 6;
     this.lookHeight = 2.5;
     this.smoothing = 0.18;
   }

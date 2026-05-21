@@ -167,12 +167,12 @@ export class MyScene extends CGFscene {
     // Apply immediate camera parameter changes for non-first modes
     if (mode === 'third') {
       this.camera.followDistance = 18;
-      this.camera.followHeight = 7;
+      this.camera.followHeight = 6;
       this.camera.lookHeight = 2.5;
       this.camera.smoothing = 0.18;
     } else if (mode === 'far') {
       this.camera.followDistance = 32;
-      this.camera.followHeight = 12;
+      this.camera.followHeight = 8;
       this.camera.lookHeight = 3.0;
       this.camera.smoothing = 0.14;
     } else if (mode === 'first') {
@@ -332,9 +332,9 @@ export class MyScene extends CGFscene {
 
   initPlayerBall() {
     this.ball = new MyRollingBall(this, 1.4);
-    const startX = 0;
-    const startZ = 0;
-    const startY = this.terrain ? this.terrain.getHeightAt(startX, startZ) + this.ball.radius : this.ball.radius;
+    const startX = 116.22;
+    const startY = 54.88;
+    const startZ = -175.48;
 
     this.ballBody = this.physics.registerBody({
       name: 'playerBall',
