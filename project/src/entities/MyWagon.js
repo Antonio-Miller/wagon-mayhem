@@ -57,6 +57,9 @@ export class MyWagon {
     this.steerAngle = 0;  // radians — front-wheel turn
     this.wheelAngle = 0;  // cumulative roll
     this.terrainAlignmentMatrix = null;
+    this.smoothedTerrainUp = null;
+    this.smoothedTerrainForward = null;
+    this.terrainAlignmentSmoothing = 8.0;
 
     // ═══════════════════ Primitives ═══════════════════
     // primitives (kept in fields so they can be unloaded)
@@ -150,36 +153,42 @@ export class MyWagon {
       this.heading = 0; this.speed = 0;
       this.steerAngle = 0; this.wheelAngle = 0;
       this.terrainAlignmentMatrix = null;
+      this.smoothedTerrainUp = null;
+      this.smoothedTerrainForward = null;
     }
   }
 
-  updateTerrainAlignment(terrain) {
+  updateTerrainAlignment(terrain, deltaTime = 0) {
     if (!terrain || typeof terrain.getTerrainNormalAt !== 'function') {
       this.terrainAlignmentMatrix = null;
+      this.smoothedTerrainUp = null;
+      this.smoothedTerrainForward = null;
       return;
     }
+
+    const smoothingFactor = 1 - Math.exp(-this.terrainAlignmentSmoothing * Math.max(0, deltaTime));
 
     const sampleDistance = Math.max(2.0, this.bodyWidth * 0.5);
     const normal = terrain.getTerrainNormalAt(this.x, this.z, sampleDistance);
     const normalLength = Math.hypot(normal[0], normal[1], normal[2]) || 1;
-    const up = [normal[0] / normalLength, normal[1] / normalLength, normal[2] / normalLength];
+    const targetUp = [normal[0] / normalLength, normal[1] / normalLength, normal[2] / normalLength];
 
     const headingForward = [Math.sin(this.heading), 0, Math.cos(this.heading)];
-    const forwardProjection = headingForward[0] * up[0] + headingForward[1] * up[1] + headingForward[2] * up[2];
+    const forwardProjection = headingForward[0] * targetUp[0] + headingForward[1] * targetUp[1] + headingForward[2] * targetUp[2];
     let forward = [
-      headingForward[0] - up[0] * forwardProjection,
-      headingForward[1] - up[1] * forwardProjection,
-      headingForward[2] - up[2] * forwardProjection,
+      headingForward[0] - targetUp[0] * forwardProjection,
+      headingForward[1] - targetUp[1] * forwardProjection,
+      headingForward[2] - targetUp[2] * forwardProjection,
     ];
 
     let forwardLength = Math.hypot(forward[0], forward[1], forward[2]);
     if (forwardLength < 1e-6) {
       forward = [0, 0, 1];
-      const fallbackProjection = forward[0] * up[0] + forward[1] * up[1] + forward[2] * up[2];
+      const fallbackProjection = forward[0] * targetUp[0] + forward[1] * targetUp[1] + forward[2] * targetUp[2];
       forward = [
-        forward[0] - up[0] * fallbackProjection,
-        forward[1] - up[1] * fallbackProjection,
-        forward[2] - up[2] * fallbackProjection,
+        forward[0] - targetUp[0] * fallbackProjection,
+        forward[1] - targetUp[1] * fallbackProjection,
+        forward[2] - targetUp[2] * fallbackProjection,
       ];
       forwardLength = Math.hypot(forward[0], forward[1], forward[2]);
     }
@@ -189,12 +198,61 @@ export class MyWagon {
       return;
     }
 
-    forward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
+    const targetForward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
+
+    if (!this.smoothedTerrainUp) {
+      this.smoothedTerrainUp = targetUp;
+    } else {
+      this.smoothedTerrainUp = [
+        this.smoothedTerrainUp[0] + (targetUp[0] - this.smoothedTerrainUp[0]) * smoothingFactor,
+        this.smoothedTerrainUp[1] + (targetUp[1] - this.smoothedTerrainUp[1]) * smoothingFactor,
+        this.smoothedTerrainUp[2] + (targetUp[2] - this.smoothedTerrainUp[2]) * smoothingFactor,
+      ];
+      const smoothedUpLength = Math.hypot(this.smoothedTerrainUp[0], this.smoothedTerrainUp[1], this.smoothedTerrainUp[2]) || 1;
+      this.smoothedTerrainUp = [
+        this.smoothedTerrainUp[0] / smoothedUpLength,
+        this.smoothedTerrainUp[1] / smoothedUpLength,
+        this.smoothedTerrainUp[2] / smoothedUpLength,
+      ];
+    }
+
+    const currentForward = this.smoothedTerrainForward || targetForward;
+    const currentProjection = currentForward[0] * this.smoothedTerrainUp[0] + currentForward[1] * this.smoothedTerrainUp[1] + currentForward[2] * this.smoothedTerrainUp[2];
+    let projectedCurrentForward = [
+      currentForward[0] - this.smoothedTerrainUp[0] * currentProjection,
+      currentForward[1] - this.smoothedTerrainUp[1] * currentProjection,
+      currentForward[2] - this.smoothedTerrainUp[2] * currentProjection,
+    ];
+
+    const targetProjection = targetForward[0] * this.smoothedTerrainUp[0] + targetForward[1] * this.smoothedTerrainUp[1] + targetForward[2] * this.smoothedTerrainUp[2];
+    const projectedTargetForward = [
+      targetForward[0] - this.smoothedTerrainUp[0] * targetProjection,
+      targetForward[1] - this.smoothedTerrainUp[1] * targetProjection,
+      targetForward[2] - this.smoothedTerrainUp[2] * targetProjection,
+    ];
+
+    const blendedForward = [
+      projectedCurrentForward[0] + (projectedTargetForward[0] - projectedCurrentForward[0]) * smoothingFactor,
+      projectedCurrentForward[1] + (projectedTargetForward[1] - projectedCurrentForward[1]) * smoothingFactor,
+      projectedCurrentForward[2] + (projectedTargetForward[2] - projectedCurrentForward[2]) * smoothingFactor,
+    ];
+
+    let blendedForwardLength = Math.hypot(blendedForward[0], blendedForward[1], blendedForward[2]);
+    if (blendedForwardLength < 1e-6) {
+      this.terrainAlignmentMatrix = null;
+      return;
+    }
+
+    this.smoothedTerrainForward = [
+      blendedForward[0] / blendedForwardLength,
+      blendedForward[1] / blendedForwardLength,
+      blendedForward[2] / blendedForwardLength,
+    ];
 
     let right = [
-      up[1] * forward[2] - up[2] * forward[1],
-      up[2] * forward[0] - up[0] * forward[2],
-      up[0] * forward[1] - up[1] * forward[0],
+      this.smoothedTerrainForward[1] * this.smoothedTerrainUp[2] - this.smoothedTerrainForward[2] * this.smoothedTerrainUp[1],
+      this.smoothedTerrainForward[2] * this.smoothedTerrainUp[0] - this.smoothedTerrainForward[0] * this.smoothedTerrainUp[2],
+      this.smoothedTerrainForward[0] * this.smoothedTerrainUp[1] - this.smoothedTerrainForward[1] * this.smoothedTerrainUp[0],
     ];
     const rightLength = Math.hypot(right[0], right[1], right[2]);
     if (rightLength < 1e-6) {
@@ -205,14 +263,17 @@ export class MyWagon {
     right = [right[0] / rightLength, right[1] / rightLength, right[2] / rightLength];
 
     forward = [
-      right[1] * up[2] - right[2] * up[1],
-      right[2] * up[0] - right[0] * up[2],
-      right[0] * up[1] - right[1] * up[0],
+      this.smoothedTerrainUp[1] * right[2] - this.smoothedTerrainUp[2] * right[1],
+      this.smoothedTerrainUp[2] * right[0] - this.smoothedTerrainUp[0] * right[2],
+      this.smoothedTerrainUp[0] * right[1] - this.smoothedTerrainUp[1] * right[0],
     ];
+
+    const forwardOutputLength = Math.hypot(forward[0], forward[1], forward[2]) || 1;
+    forward = [forward[0] / forwardOutputLength, forward[1] / forwardOutputLength, forward[2] / forwardOutputLength];
 
     this.terrainAlignmentMatrix = new Float32Array([
       right[0], right[1], right[2], 0,
-      up[0], up[1], up[2], 0,
+      this.smoothedTerrainUp[0], this.smoothedTerrainUp[1], this.smoothedTerrainUp[2], 0,
       forward[0], forward[1], forward[2], 0,
       0, 0, 0, 1,
     ]);
@@ -306,7 +367,7 @@ export class MyWagon {
     this.scene.translate(0, this.axleY, z);
 
     // Steering rotation (front axle only)
-    if (steerable) this.scene.rotate(this.steerAngle, 0, 1, 0);
+    if (steerable) this.scene.rotate(-this.steerAngle, 0, 1, 0);
 
     // ── Axle bar ── (cylinder along Y, rotated to lie along X)
     this.metalMat.apply();

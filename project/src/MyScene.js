@@ -151,7 +151,7 @@ export class MyScene extends CGFscene {
     );
 
     this.grass = new MyGrass(this, this.terrain);
-    this.rocks = new MyRockSet(this, 50, this.terrain);
+    this.rocks = new MyRockSet(this, 20, this.terrain);
     this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
     this.flowers = new MyFlowerSet(this, 80, this.terrain, this.rocks, this.pineTrees);
     this.physics = new MyPhysicsEngine(this, {
@@ -486,7 +486,7 @@ export class MyScene extends CGFscene {
         const dist2 = dx * dx + dy * dy + dz * dz;
         // rock primitive is a unit sphere scaled by scaleX/Y/Z
         const rockRadius = Math.max(rock.scaleX, rock.scaleY, rock.scaleZ) * 1.0;
-        const clashRadius = rockRadius + (this.ball?.radius ?? 1.0);
+        const clashRadius = rockRadius;
         if (dist2 > 0 && dist2 < clashRadius * clashRadius) {
           const dist = Math.sqrt(dist2) || 0.0001;
           const push = (clashRadius - dist) / dist;
@@ -705,66 +705,84 @@ export class MyScene extends CGFscene {
   constrainWagonPosition(wagon) {
     if (!wagon) return;
 
-    const wx = wagon.x;
-    const wy = wagon.y ?? (this.terrain ? this.terrain.getHeightAt(wagon.x, wagon.z) : 0);
-    const wz = wagon.z;
-
     const halfWidth = (wagon.bodyWidth ?? 6.0) * 0.5;
     const halfLength = (wagon.bodyLength ?? 12.0) * 0.5;
-    const wheelReach = (wagon.axleFullWidth ?? wagon.bodyWidth ?? 6.0) * 0.5 + 0.4;
-    const wagonHeight = (wagon.axleY ?? 1.8) + (wagon.wheelRadius ?? 1.8) + (wagon.wallHeight ?? 2.0);
-    const halfHeight = wagonHeight * 0.5;
+    const wagonRadius = Math.hypot(halfWidth, halfLength);
+    const wagonBaseY = wagon.y ?? (this.terrain ? this.terrain.getHeightAt(wagon.x, wagon.z) : 0);
+    const wagonHeight = (wagon.floorY ?? 1.6) + (wagon.floorThick ?? 0.2) + (wagon.wallHeight ?? 2.0) + (wagon.wheelRadius ?? 1.8) * 1.7;
+    const wagonTopY = wagonBaseY + wagonHeight;
 
-    const sinHeading = Math.sin(wagon.heading || 0);
-    const cosHeading = Math.cos(wagon.heading || 0);
+    let wx = wagon.x;
+    let wz = wagon.z;
 
-    const toLocal = (x, y, z) => {
-      const dx = x - wx;
-      const dz = z - wz;
-      return {
-        x: dx * cosHeading - dz * sinHeading,
-        y: y - wy,
-        z: dx * sinHeading + dz * cosHeading,
-      };
+    const syncPose = () => {
+      wx = wagon.x;
+      wz = wagon.z;
     };
 
-    const pushOutFromBox = (point, maxX, maxY, maxZ) => {
-      const overlapX = maxX - Math.abs(point.x);
-      const overlapY = maxY - Math.abs(point.y);
-      const overlapZ = maxZ - Math.abs(point.z);
-      if (overlapX <= 0 || overlapY <= 0 || overlapZ <= 0) return null;
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-      const minOverlap = Math.min(overlapX, overlapY, overlapZ);
-      const corrected = { x: point.x, y: point.y, z: point.z };
-      if (minOverlap === overlapX) corrected.x = Math.sign(point.x || 1) * maxX;
-      else if (minOverlap === overlapY) corrected.y = Math.sign(point.y || 1) * maxY;
-      else corrected.z = Math.sign(point.z || 1) * maxZ;
-      return corrected;
-    };
+    const moveAwayFromPoint = (centerX, centerZ, obstacleRadius) => {
+      const dx = wx - centerX;
+      const dz = wz - centerZ;
+      const distance = Math.hypot(dx, dz);
+      const minDistance = wagonRadius + obstacleRadius;
 
-    const applyLocalCorrection = (localPoint) => {
-      wagon.x = wx + localPoint.x * cosHeading + localPoint.z * sinHeading;
-      wagon.y = wy + localPoint.y;
-      wagon.z = wz - localPoint.x * sinHeading + localPoint.z * cosHeading;
+      if (distance >= minDistance) {
+        return false;
+      }
+
+      if (distance < 1e-6) {
+        const fallbackX = Math.abs(wx) > Math.abs(wz) ? Math.sign(wx || 1) : 0;
+        const fallbackZ = fallbackX === 0 ? Math.sign(wz || 1) || 1 : 0;
+        wagon.x += fallbackX * minDistance;
+        wagon.z += fallbackZ * minDistance;
+      } else {
+        const push = (minDistance - distance) / distance;
+        wagon.x += dx * push;
+        wagon.z += dz * push;
+      }
+
       wagon.speed = 0;
+      syncPose();
+      return true;
+    };
+
+    const moveAwayFromSegment = (x1, z1, x2, z2, obstacleRadius) => {
+      const segDx = x2 - x1;
+      const segDz = z2 - z1;
+      const lenSq = segDx * segDx + segDz * segDz;
+
+      if (lenSq < 1e-6) {
+        return moveAwayFromPoint(x1, z1, obstacleRadius);
+      }
+
+      const t = clamp(((wx - x1) * segDx + (wz - z1) * segDz) / lenSq, 0, 1);
+      const closestX = x1 + t * segDx;
+      const closestZ = z1 + t * segDz;
+      return moveAwayFromPoint(closestX, closestZ, obstacleRadius);
     };
 
     const horizDist = Math.sqrt(wx * wx + wz * wz);
-    const maxHoriz = Math.max(10, this.domeRadius - Math.max(halfWidth, halfLength, wheelReach));
+    const maxHoriz = Math.max(10, this.domeRadius - wagonRadius);
     if (horizDist > maxHoriz) {
       const scale = maxHoriz / horizDist;
       wagon.x = wx * scale;
       wagon.z = wz * scale;
       wagon.speed = 0;
+      syncPose();
     }
 
     if (this.rocks && Array.isArray(this.rocks.rocks)) {
       for (const rock of this.rocks.rocks) {
         if (!rock.placed) continue;
-        const local = toLocal(rock.x, rock.y, rock.z);
         const rockRadius = Math.max(rock.scaleX, rock.scaleY, rock.scaleZ) * 1.0;
-        const correction = pushOutFromBox(local, halfWidth + rockRadius, halfHeight + rockRadius, halfLength + rockRadius);
-        if (correction) applyLocalCorrection(correction);
+
+        const rockBottomY = rock.y - rockRadius;
+        const rockTopY = rock.y + rockRadius;
+        if (wagonTopY < rockBottomY || wagonBaseY > rockTopY) continue;
+
+        moveAwayFromPoint(rock.x, rock.z, rockRadius);
       }
     }
 
@@ -772,29 +790,48 @@ export class MyScene extends CGFscene {
       for (const tree of this.pineTrees.trees) {
         if (!tree.placed) continue;
 
+        const trunkBaseY = tree.y;
         const trunkTop = tree.y + tree.tree.trunkHeight;
         const foliageTop = tree.y + tree.tree.trunkHeight + tree.tree.foliageHeight * 1.92;
-        if (wy < tree.y - 0.1 || wy > foliageTop + 0.1) continue;
+        if (wagonTopY < trunkBaseY || wagonBaseY > foliageTop) continue;
 
-        if (wy <= trunkTop + 0.1) {
-          const local = toLocal(tree.x, tree.y + tree.tree.trunkHeight * 0.5, tree.z);
-          const trunkRadius = tree.tree.trunkRadius;
-          const correction = pushOutFromBox(local, halfWidth + trunkRadius, halfHeight, halfLength + trunkRadius);
-          if (correction) {
-            applyLocalCorrection(correction);
-            continue;
-          }
+        if (wagonBaseY <= trunkTop && wagonTopY >= trunkBaseY) {
+          moveAwayFromPoint(tree.x, tree.z, tree.tree.trunkRadius);
         }
 
-        const foliageRadius = Math.max(tree.tree.trunkRadius, tree.tree.foliageRadius);
-        const foliageLocal = toLocal(tree.x, tree.y + tree.tree.trunkHeight + tree.tree.foliageHeight * 0.55, tree.z);
-        const foliageCorrection = pushOutFromBox(
-          foliageLocal,
-          halfWidth + foliageRadius,
-          halfHeight + tree.tree.foliageHeight * 0.5,
-          halfLength + foliageRadius
+        const sampleHeights = [
+          wagonBaseY + wagonHeight * 0.25,
+          wagonBaseY + wagonHeight * 0.55,
+          wagonTopY,
+        ];
+
+        const checkCrown = (baseY, height, radius) => {
+          for (const sampleY of sampleHeights) {
+            const localY = sampleY - baseY;
+            if (localY < 0 || localY > height) {
+              continue;
+            }
+
+            const radiusAtHeight = radius * (1 - localY / height);
+            if (moveAwayFromPoint(tree.x, tree.z, radiusAtHeight)) {
+              return true;
+            }
+          }
+
+          return false;
+        };
+
+        checkCrown(
+          tree.y + tree.tree.trunkHeight,
+          tree.tree.foliageHeight,
+          tree.tree.foliageRadius
         );
-        if (foliageCorrection) applyLocalCorrection(foliageCorrection);
+
+        checkCrown(
+          tree.y + tree.tree.trunkHeight + tree.tree.foliageHeight * 0.92,
+          tree.tree.foliageHeight * 0.72,
+          tree.tree.foliageRadius * 0.72
+        );
       }
     }
 
@@ -808,7 +845,7 @@ export class MyScene extends CGFscene {
       const baseY = this.barn.positionY ?? (this.terrain ? this.terrain.getHeightAt(this.barn.positionX, this.barn.positionZ) : 0);
       const topY = baseY + (this.barn.bodyTotalHeight ?? (this.barn.bodyHeight || 20)) + (this.barn.roofHeight || 6);
 
-      if (wy >= baseY - 1 && wy <= topY + 1) {
+      if (wagonTopY >= baseY - 1 && wagonBaseY <= topY + 1) {
         if (wagon.x >= minX && wagon.x <= maxX && wagon.z >= minZ && wagon.z <= maxZ) {
           const distLeft = wagon.x - minX;
           const distRight = maxX - wagon.x;
@@ -820,6 +857,7 @@ export class MyScene extends CGFscene {
           else if (minDist === distFront) wagon.z = minZ;
           else wagon.z = maxZ;
           wagon.speed = 0;
+          syncPose();
         }
       }
     }
@@ -828,12 +866,10 @@ export class MyScene extends CGFscene {
       for (const post of this.barnFence.fencePosts) {
         const postBaseY = post.y ?? this.barnFence.getTerrainHeight(post.x, post.z);
         const postTopY = postBaseY + (this.barnFence.postHeight ?? 4.2);
-        if (wy < postBaseY - 1 || wy > postTopY + 1) continue;
 
-        const local = toLocal(post.x, postBaseY + (this.barnFence.postHeight ?? 4.2) * 0.5, post.z);
-        const radius = this.barnFence.postRadius ?? 0.35;
-        const correction = pushOutFromBox(local, halfWidth + radius, halfHeight + (this.barnFence.postHeight ?? 4.2) * 0.5, halfLength + radius);
-        if (correction) applyLocalCorrection(correction);
+        if (wagonTopY < postBaseY - 1 || wagonBaseY > postTopY + 1) continue;
+
+        moveAwayFromPoint(post.x, post.z, this.barnFence.postRadius ?? 0.35);
       }
 
       const postCount = this.barnFence.fencePosts.length;
@@ -859,13 +895,12 @@ export class MyScene extends CGFscene {
           ];
 
           for (const railHeight of railHeights) {
-            const railDist = Math.abs(wy - railHeight);
-            if (railDist > 2.5) continue;
-
             const p1x = post.x;
             const p1z = post.z;
             const p2x = nextPost.x;
             const p2z = nextPost.z;
+            if (wagonTopY < railHeight - horizRadius || wagonBaseY > railHeight + horizRadius) continue;
+
             const dx = p2x - p1x;
             const dz = p2z - p1z;
             const lenSq = dx * dx + dz * dz;
@@ -876,9 +911,8 @@ export class MyScene extends CGFscene {
             const t = Math.max(0, Math.min(1, (toBalX * dx + toBalZ * dz) / lenSq));
             const closestX = p1x + t * dx;
             const closestZ = p1z + t * dz;
-            const local = toLocal(closestX, railHeight, closestZ);
-            const correction = pushOutFromBox(local, halfWidth + horizRadius, halfHeight + horizRadius, halfLength + horizRadius);
-            if (correction) applyLocalCorrection(correction);
+
+            moveAwayFromSegment(p1x, p1z, p2x, p2z, horizRadius);
           }
         }
       }
@@ -1146,7 +1180,7 @@ export class MyScene extends CGFscene {
       if (this.terrain) {
         this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
       }
-      this.wagon.updateTerrainAlignment(this.terrain);
+      this.wagon.updateTerrainAlignment(this.terrain, deltaTime);
       // Make camera follow wagon when it's active
       if (this.camera && typeof this.camera.follow === 'function') {
         const target = vec3.fromValues(this.wagon.x, this.wagon.y, this.wagon.z);
