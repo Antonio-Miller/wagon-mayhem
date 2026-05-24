@@ -56,6 +56,7 @@ export class MyWagon {
     this.speed      = 0;  // world units / s
     this.steerAngle = 0;  // radians — front-wheel turn
     this.wheelAngle = 0;  // cumulative roll
+    this.terrainAlignmentMatrix = null;
 
     // ═══════════════════ Primitives ═══════════════════
     // primitives (kept in fields so they can be unloaded)
@@ -94,11 +95,13 @@ export class MyWagon {
   update(deltaTime, keys) {
     const ACCEL        = 15.0;  // units/s²  (scaled to larger world)
     const DECEL        = 25.0;  // braking
-    const MAX_SPEED    = 30.0;  // ~reasonable wagon speed at this scale
+    const MAX_SPEED    = 15.0;  // base top speed for gear 1
     const STEER_RATE   = 1.5;   // rad/s
     const MAX_STEER    = 0.45;  // ~25°
     const STEER_RETURN = 2.5;   // rad/s back to centre
     const FRICTION     = 5.0;   // passive slow-down
+    const forwardGear = Math.max(1, keys?.wagonForwardGear ?? 1);
+    const reverseGear = Math.max(1, keys?.wagonReverseGear ?? 1);
 
     // ── Acceleration / braking ──
     // SPACE applies an immediate brake (while held) that reduces speed toward 0
@@ -108,9 +111,9 @@ export class MyWagon {
     }
     // W accelerates forward, S decelerates and can go into negative (reverse)
     else if (keys["KeyW"]) {
-      this.speed = Math.min(this.speed + ACCEL * deltaTime, MAX_SPEED);
+      this.speed = Math.min(this.speed + (ACCEL * forwardGear) * deltaTime, MAX_SPEED * forwardGear);
     } else if (keys["KeyS"]) {
-      this.speed = Math.max(this.speed - DECEL * deltaTime, -MAX_SPEED);
+      this.speed = Math.max(this.speed - (DECEL * reverseGear) * deltaTime, -MAX_SPEED * reverseGear);
     } else {
       // Friction: bring speed toward zero from either positive or negative
       if (this.speed > 0) this.speed = Math.max(this.speed - FRICTION * deltaTime, 0);
@@ -146,7 +149,73 @@ export class MyWagon {
       this.x = 0; this.z = 0; this.y = 0;
       this.heading = 0; this.speed = 0;
       this.steerAngle = 0; this.wheelAngle = 0;
+      this.terrainAlignmentMatrix = null;
     }
+  }
+
+  updateTerrainAlignment(terrain) {
+    if (!terrain || typeof terrain.getTerrainNormalAt !== 'function') {
+      this.terrainAlignmentMatrix = null;
+      return;
+    }
+
+    const sampleDistance = Math.max(2.0, this.bodyWidth * 0.5);
+    const normal = terrain.getTerrainNormalAt(this.x, this.z, sampleDistance);
+    const normalLength = Math.hypot(normal[0], normal[1], normal[2]) || 1;
+    const up = [normal[0] / normalLength, normal[1] / normalLength, normal[2] / normalLength];
+
+    const headingForward = [Math.sin(this.heading), 0, Math.cos(this.heading)];
+    const forwardProjection = headingForward[0] * up[0] + headingForward[1] * up[1] + headingForward[2] * up[2];
+    let forward = [
+      headingForward[0] - up[0] * forwardProjection,
+      headingForward[1] - up[1] * forwardProjection,
+      headingForward[2] - up[2] * forwardProjection,
+    ];
+
+    let forwardLength = Math.hypot(forward[0], forward[1], forward[2]);
+    if (forwardLength < 1e-6) {
+      forward = [0, 0, 1];
+      const fallbackProjection = forward[0] * up[0] + forward[1] * up[1] + forward[2] * up[2];
+      forward = [
+        forward[0] - up[0] * fallbackProjection,
+        forward[1] - up[1] * fallbackProjection,
+        forward[2] - up[2] * fallbackProjection,
+      ];
+      forwardLength = Math.hypot(forward[0], forward[1], forward[2]);
+    }
+
+    if (forwardLength < 1e-6) {
+      this.terrainAlignmentMatrix = null;
+      return;
+    }
+
+    forward = [forward[0] / forwardLength, forward[1] / forwardLength, forward[2] / forwardLength];
+
+    let right = [
+      up[1] * forward[2] - up[2] * forward[1],
+      up[2] * forward[0] - up[0] * forward[2],
+      up[0] * forward[1] - up[1] * forward[0],
+    ];
+    const rightLength = Math.hypot(right[0], right[1], right[2]);
+    if (rightLength < 1e-6) {
+      this.terrainAlignmentMatrix = null;
+      return;
+    }
+
+    right = [right[0] / rightLength, right[1] / rightLength, right[2] / rightLength];
+
+    forward = [
+      right[1] * up[2] - right[2] * up[1],
+      right[2] * up[0] - right[0] * up[2],
+      right[0] * up[1] - right[1] * up[0],
+    ];
+
+    this.terrainAlignmentMatrix = new Float32Array([
+      right[0], right[1], right[2], 0,
+      up[0], up[1], up[2], 0,
+      forward[0], forward[1], forward[2], 0,
+      0, 0, 0, 1,
+    ]);
   }
 
   // ────────────────────────────────────────────────────────
@@ -293,7 +362,11 @@ export class MyWagon {
 
     // World position + heading
     this.scene.translate(this.x, this.y, this.z);
-    this.scene.rotate(this.heading, 0, 1, 0);
+    if (this.terrainAlignmentMatrix) {
+      this.scene.multMatrix(this.terrainAlignmentMatrix);
+    } else {
+      this.scene.rotate(this.heading, 0, 1, 0);
+    }
 
     this.displayBody();
     this.displayCover();

@@ -28,6 +28,11 @@ export class MyScene extends CGFscene {
       d: false,
       space: false,
     };
+    this.wagonDoubleTapWindowMs = 300;
+    this.wagonDriveState = {
+      w: { pressed: false, lastReleaseTime: -Infinity, gear: 1 },
+      s: { pressed: false, lastReleaseTime: -Infinity, gear: 1 },
+    };
     // Active actor choice: 'Ball' or 'Wagon' (default: Wagon)
     this.actorChoice = 'Wagon';
     this._lastActorChoice = this.actorChoice;
@@ -72,6 +77,16 @@ export class MyScene extends CGFscene {
         this.ballBody.velocity[2] = 0;
         this.ballBody.active = false;
         this.ballBody.settled = true;
+      }
+      if (this.keys) {
+        this.keys.wagonForwardGear = 1;
+        this.keys.wagonReverseGear = 1;
+      }
+      if (this.wagonDriveState) {
+        this.wagonDriveState.w.gear = 1;
+        this.wagonDriveState.s.gear = 1;
+        this.wagonDriveState.w.pressed = false;
+        this.wagonDriveState.s.pressed = false;
       }
     }
   }
@@ -894,6 +909,44 @@ export class MyScene extends CGFscene {
     return '';
   }
 
+  getEventTimestamp(event) {
+    if (event && Number.isFinite(event.timeStamp)) {
+      return event.timeStamp;
+    }
+
+    return Date.now();
+  }
+
+  updateWagonDriveState(direction, isDown, event) {
+    if (!this.wagonDriveState || !this.keys) {
+      return;
+    }
+
+    const state = this.wagonDriveState[direction];
+    if (!state) {
+      return;
+    }
+
+    const now = this.getEventTimestamp(event);
+
+    if (isDown) {
+      if (!state.pressed) {
+        state.gear = (now - state.lastReleaseTime <= this.wagonDoubleTapWindowMs) ? 2 : 1;
+        state.pressed = true;
+      }
+    } else {
+      state.pressed = false;
+      state.lastReleaseTime = now;
+      state.gear = 1;
+    }
+
+    if (direction === 'w') {
+      this.keys.wagonForwardGear = state.gear;
+    } else if (direction === 's') {
+      this.keys.wagonReverseGear = state.gear;
+    }
+  }
+
   handleControlKeyDown(event) {
     const key = this.getControlKey(event);
     if (!key) {
@@ -902,10 +955,12 @@ export class MyScene extends CGFscene {
 
     if (key === 'w') {
       this.playerInput.w = true;
+      this.updateWagonDriveState('w', true, event);
     } else if (key === 'a') {
       this.playerInput.a = true;
     } else if (key === 's') {
       this.playerInput.s = true;
+      this.updateWagonDriveState('s', true, event);
     } else if (key === 'd') {
       this.playerInput.d = true;
     } else if (key === 'space') {
@@ -922,10 +977,12 @@ export class MyScene extends CGFscene {
 
     if (key === 'w') {
       this.playerInput.w = false;
+      this.updateWagonDriveState('w', false, event);
     } else if (key === 'a') {
       this.playerInput.a = false;
     } else if (key === 's') {
       this.playerInput.s = false;
+      this.updateWagonDriveState('s', false, event);
     } else if (key === 'd') {
       this.playerInput.d = false;
     } else if (key === 'space') {
@@ -1086,6 +1143,10 @@ export class MyScene extends CGFscene {
       }
       // constrain wagon against world geometry
       this.constrainWagonPosition(this.wagon);
+      if (this.terrain) {
+        this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
+      }
+      this.wagon.updateTerrainAlignment(this.terrain);
       // Make camera follow wagon when it's active
       if (this.camera && typeof this.camera.follow === 'function') {
         const target = vec3.fromValues(this.wagon.x, this.wagon.y, this.wagon.z);

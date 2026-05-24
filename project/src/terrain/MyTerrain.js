@@ -456,6 +456,24 @@ export class MyTerrain {
     return this.getFlattenedHeightAt(worldX, worldZ);
   }
 
+  getTerrainNormalAt(worldX, worldZ, sampleDistance = 3.0) {
+    const step = Math.max(0.001, sampleDistance);
+    const heightLeft = this.getHeightAt(worldX - step, worldZ);
+    const heightRight = this.getHeightAt(worldX + step, worldZ);
+    const heightBack = this.getHeightAt(worldX, worldZ - step);
+    const heightFront = this.getHeightAt(worldX, worldZ + step);
+
+    const slopeX = (heightRight - heightLeft) / (2 * step);
+    const slopeZ = (heightFront - heightBack) / (2 * step);
+
+    const normalX = -slopeX;
+    const normalY = 1;
+    const normalZ = -slopeZ;
+    const length = Math.hypot(normalX, normalY, normalZ) || 1;
+
+    return [normalX / length, normalY / length, normalZ / length];
+  }
+
   display() {
     if (!this.heightmap || this.heightmap.texID === -1 || !this.terrainTexture || this.terrainTexture.texID === -1) {
       return;
