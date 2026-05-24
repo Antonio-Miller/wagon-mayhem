@@ -42,7 +42,23 @@ export class MyRollingBall extends CGFobject {
     this.scene.rotate(this.spinX, 1, 0, 0);
     this.scene.rotate(this.spinZ, 0, 0, 1);
     this.appearance.apply();
-    this.sphere.display();
+    if (this.sphere) this.sphere.display();
     this.scene.popMatrix();
+  }
+
+  unloadModel() {
+    this.sphere = null;
+    this.appearance = null;
+  }
+
+  loadModel() {
+    if (!this.sphere) this.sphere = new MySphere(this.scene, 18, 32, this.radius, false);
+    if (!this.appearance) {
+      this.appearance = new CGFappearance(this.scene);
+      this.appearance.setAmbient(0.55, 0.05, 0.05, 1.0);
+      this.appearance.setDiffuse(0.9, 0.08, 0.08, 1.0);
+      this.appearance.setSpecular(0.35, 0.12, 0.12, 1.0);
+      this.appearance.setShininess(35.0);
+    }
   }
 }

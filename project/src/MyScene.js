@@ -28,6 +28,52 @@ export class MyScene extends CGFscene {
       d: false,
       space: false,
     };
+    // Active actor choice: 'Ball' or 'Wagon' (default: Wagon)
+    this.actorChoice = 'Wagon';
+    this._lastActorChoice = this.actorChoice;
+  }
+
+  _switchActiveActor(prev, next) {
+    if (prev === next) return;
+
+    // Switching TO Ball: place ball at wagon's position
+    if (next === 'Ball') {
+      if (this.wagon && this.ballBody) {
+        const x = this.wagon.x;
+        const z = this.wagon.z;
+        const y = this.terrain ? this.terrain.getHeightAt(x, z) + (this.ball?.radius || 0) : (this.ball?.radius || 0);
+        this.ballBody.position[0] = x;
+        this.ballBody.position[1] = y;
+        this.ballBody.position[2] = z;
+        this.ballBody.velocity[0] = 0;
+        this.ballBody.velocity[1] = 0;
+        this.ballBody.velocity[2] = 0;
+        this.ballBody.active = true;
+        this.ballBody.settled = true;
+        this.ballLastPosition = vec3.clone(this.ballBody.position);
+        // copy heading so camera aligns
+        this.ballHeading = this.wagon.heading || 0;
+      }
+    }
+
+    // Switching TO Wagon: place wagon at ball's position
+    if (next === 'Wagon') {
+      if (this.wagon && this.ballBody) {
+        const x = this.ballBody.position[0];
+        const z = this.ballBody.position[2];
+        const y = this.terrain ? this.terrain.getHeightAt(x, z) : 0;
+        this.wagon.x = x;
+        this.wagon.z = z;
+        this.wagon.y = y;
+        this.wagon.heading = this.ballHeading || 0;
+        // disable ball physics so it doesn't fall while wagon is active
+        this.ballBody.velocity[0] = 0;
+        this.ballBody.velocity[1] = 0;
+        this.ballBody.velocity[2] = 0;
+        this.ballBody.active = false;
+        this.ballBody.settled = true;
+      }
+    }
   }
   init(application) {
     super.init(application);
@@ -100,6 +146,17 @@ export class MyScene extends CGFscene {
     this.registerPhysicsBodies();
     this.initPlayerBall();
     this.wagon = new MyWagon(this);
+    // Ensure wagon initially spawns at the ball coords
+    if (this.ballBody && this.wagon) {
+      this.wagon.x = this.ballBody.position[0];
+      this.wagon.z = this.ballBody.position[2];
+      this.wagon.y = this.terrain ? this.terrain.getHeightAt(this.wagon.x, this.wagon.z) : 0;
+    }
+    // If default actor is Wagon, ensure ball physics is disabled so wagon is the active one
+    if (this.actorChoice === 'Wagon' && this.ballBody) {
+      this._switchActiveActor('Ball', 'Wagon');
+      this._lastActorChoice = this.actorChoice;
+    }
     this.lastUpdateTime = 0;
     this.cameraDebugEnabled = false;
     this.cameraDebugIntervalMs = 500;
@@ -110,10 +167,11 @@ export class MyScene extends CGFscene {
     // Keyboard state — written by MyInterface, read by wagon.update()
     this.keys = {};
 
-    //Objects connected to MyInterface
+    // Objects connected to MyInterface
     this.displayAxis = true;
     this.sunEnabled = true;
-    this.displayWagon = true;
+    // Active actor shown via `actorChoice` (GUI added in MyInterface)
+    this.actorChoice = this.actorChoice || 'Wagon';
   }
   computeSkyFromTime() {
     const t = this.timeOfDay % 24;
@@ -629,6 +687,196 @@ export class MyScene extends CGFscene {
     }
   }
 
+  constrainWagonPosition(wagon) {
+    if (!wagon) return;
+
+    const wx = wagon.x;
+    const wy = wagon.y ?? (this.terrain ? this.terrain.getHeightAt(wagon.x, wagon.z) : 0);
+    const wz = wagon.z;
+
+    const halfWidth = (wagon.bodyWidth ?? 6.0) * 0.5;
+    const halfLength = (wagon.bodyLength ?? 12.0) * 0.5;
+    const wheelReach = (wagon.axleFullWidth ?? wagon.bodyWidth ?? 6.0) * 0.5 + 0.4;
+    const wagonHeight = (wagon.axleY ?? 1.8) + (wagon.wheelRadius ?? 1.8) + (wagon.wallHeight ?? 2.0);
+    const halfHeight = wagonHeight * 0.5;
+
+    const sinHeading = Math.sin(wagon.heading || 0);
+    const cosHeading = Math.cos(wagon.heading || 0);
+
+    const toLocal = (x, y, z) => {
+      const dx = x - wx;
+      const dz = z - wz;
+      return {
+        x: dx * cosHeading - dz * sinHeading,
+        y: y - wy,
+        z: dx * sinHeading + dz * cosHeading,
+      };
+    };
+
+    const pushOutFromBox = (point, maxX, maxY, maxZ) => {
+      const overlapX = maxX - Math.abs(point.x);
+      const overlapY = maxY - Math.abs(point.y);
+      const overlapZ = maxZ - Math.abs(point.z);
+      if (overlapX <= 0 || overlapY <= 0 || overlapZ <= 0) return null;
+
+      const minOverlap = Math.min(overlapX, overlapY, overlapZ);
+      const corrected = { x: point.x, y: point.y, z: point.z };
+      if (minOverlap === overlapX) corrected.x = Math.sign(point.x || 1) * maxX;
+      else if (minOverlap === overlapY) corrected.y = Math.sign(point.y || 1) * maxY;
+      else corrected.z = Math.sign(point.z || 1) * maxZ;
+      return corrected;
+    };
+
+    const applyLocalCorrection = (localPoint) => {
+      wagon.x = wx + localPoint.x * cosHeading + localPoint.z * sinHeading;
+      wagon.y = wy + localPoint.y;
+      wagon.z = wz - localPoint.x * sinHeading + localPoint.z * cosHeading;
+      wagon.speed = 0;
+    };
+
+    const horizDist = Math.sqrt(wx * wx + wz * wz);
+    const maxHoriz = Math.max(10, this.domeRadius - Math.max(halfWidth, halfLength, wheelReach));
+    if (horizDist > maxHoriz) {
+      const scale = maxHoriz / horizDist;
+      wagon.x = wx * scale;
+      wagon.z = wz * scale;
+      wagon.speed = 0;
+    }
+
+    if (this.rocks && Array.isArray(this.rocks.rocks)) {
+      for (const rock of this.rocks.rocks) {
+        if (!rock.placed) continue;
+        const local = toLocal(rock.x, rock.y, rock.z);
+        const rockRadius = Math.max(rock.scaleX, rock.scaleY, rock.scaleZ) * 1.0;
+        const correction = pushOutFromBox(local, halfWidth + rockRadius, halfHeight + rockRadius, halfLength + rockRadius);
+        if (correction) applyLocalCorrection(correction);
+      }
+    }
+
+    if (this.pineTrees && Array.isArray(this.pineTrees.trees)) {
+      for (const tree of this.pineTrees.trees) {
+        if (!tree.placed) continue;
+
+        const trunkTop = tree.y + tree.tree.trunkHeight;
+        const foliageTop = tree.y + tree.tree.trunkHeight + tree.tree.foliageHeight * 1.92;
+        if (wy < tree.y - 0.1 || wy > foliageTop + 0.1) continue;
+
+        if (wy <= trunkTop + 0.1) {
+          const local = toLocal(tree.x, tree.y + tree.tree.trunkHeight * 0.5, tree.z);
+          const trunkRadius = tree.tree.trunkRadius;
+          const correction = pushOutFromBox(local, halfWidth + trunkRadius, halfHeight, halfLength + trunkRadius);
+          if (correction) {
+            applyLocalCorrection(correction);
+            continue;
+          }
+        }
+
+        const foliageRadius = Math.max(tree.tree.trunkRadius, tree.tree.foliageRadius);
+        const foliageLocal = toLocal(tree.x, tree.y + tree.tree.trunkHeight + tree.tree.foliageHeight * 0.55, tree.z);
+        const foliageCorrection = pushOutFromBox(
+          foliageLocal,
+          halfWidth + foliageRadius,
+          halfHeight + tree.tree.foliageHeight * 0.5,
+          halfLength + foliageRadius
+        );
+        if (foliageCorrection) applyLocalCorrection(foliageCorrection);
+      }
+    }
+
+    if (this.barn) {
+      const halfBarnWidth = this.barn.width / 2 + halfWidth + Math.max(this.barn.width, this.barn.depth) * 0.02;
+      const halfDepth = this.barn.depth / 2 + halfLength + Math.max(this.barn.width, this.barn.depth) * 0.02;
+      const minX = this.barn.positionX - halfBarnWidth;
+      const maxX = this.barn.positionX + halfBarnWidth;
+      const minZ = this.barn.positionZ - halfDepth;
+      const maxZ = this.barn.positionZ + halfDepth;
+      const baseY = this.barn.positionY ?? (this.terrain ? this.terrain.getHeightAt(this.barn.positionX, this.barn.positionZ) : 0);
+      const topY = baseY + (this.barn.bodyTotalHeight ?? (this.barn.bodyHeight || 20)) + (this.barn.roofHeight || 6);
+
+      if (wy >= baseY - 1 && wy <= topY + 1) {
+        if (wagon.x >= minX && wagon.x <= maxX && wagon.z >= minZ && wagon.z <= maxZ) {
+          const distLeft = wagon.x - minX;
+          const distRight = maxX - wagon.x;
+          const distFront = wagon.z - minZ;
+          const distBack = maxZ - wagon.z;
+          const minDist = Math.min(distLeft, distRight, distFront, distBack);
+          if (minDist === distLeft) wagon.x = minX;
+          else if (minDist === distRight) wagon.x = maxX;
+          else if (minDist === distFront) wagon.z = minZ;
+          else wagon.z = maxZ;
+          wagon.speed = 0;
+        }
+      }
+    }
+
+    if (this.barnFence && Array.isArray(this.barnFence.fencePosts)) {
+      for (const post of this.barnFence.fencePosts) {
+        const postBaseY = post.y ?? this.barnFence.getTerrainHeight(post.x, post.z);
+        const postTopY = postBaseY + (this.barnFence.postHeight ?? 4.2);
+        if (wy < postBaseY - 1 || wy > postTopY + 1) continue;
+
+        const local = toLocal(post.x, postBaseY + (this.barnFence.postHeight ?? 4.2) * 0.5, post.z);
+        const radius = this.barnFence.postRadius ?? 0.35;
+        const correction = pushOutFromBox(local, halfWidth + radius, halfHeight + (this.barnFence.postHeight ?? 4.2) * 0.5, halfLength + radius);
+        if (correction) applyLocalCorrection(correction);
+      }
+
+      const postCount = this.barnFence.fencePosts.length;
+      if (postCount >= 2) {
+        const horizRadius = this.barnFence.horizontalRadius ?? 0.15;
+
+        for (let i = 0; i < postCount; i++) {
+          const post = this.barnFence.fencePosts[i];
+          const nextPost = this.barnFence.fencePosts[(i + 1) % postCount];
+
+          let isConsecutive = true;
+          if (this.barnFence.fullPostCount && post.index !== undefined && nextPost.index !== undefined) {
+            isConsecutive = ((post.index + 1) % this.barnFence.fullPostCount) === nextPost.index;
+          }
+          if (!isConsecutive) continue;
+
+          const postBaseY = post.y ?? this.barnFence.getTerrainHeight(post.x, post.z);
+          const nextPostBaseY = nextPost.y ?? this.barnFence.getTerrainHeight(nextPost.x, nextPost.z);
+          const avgBaseY = (postBaseY + nextPostBaseY) * 0.5;
+          const railHeights = [
+            avgBaseY + (this.barnFence.baseHeight ?? 0.15) + (this.barnFence.postHeight ?? 4.2) * 0.55,
+            avgBaseY + (this.barnFence.baseHeight ?? 0.15) + (this.barnFence.postHeight ?? 4.2) * 0.86,
+          ];
+
+          for (const railHeight of railHeights) {
+            const railDist = Math.abs(wy - railHeight);
+            if (railDist > 2.5) continue;
+
+            const p1x = post.x;
+            const p1z = post.z;
+            const p2x = nextPost.x;
+            const p2z = nextPost.z;
+            const dx = p2x - p1x;
+            const dz = p2z - p1z;
+            const lenSq = dx * dx + dz * dz;
+            if (lenSq < 0.001) continue;
+
+            const toBalX = wx - p1x;
+            const toBalZ = wz - p1z;
+            const t = Math.max(0, Math.min(1, (toBalX * dx + toBalZ * dz) / lenSq));
+            const closestX = p1x + t * dx;
+            const closestZ = p1z + t * dz;
+            const local = toLocal(closestX, railHeight, closestZ);
+            const correction = pushOutFromBox(local, halfWidth + horizRadius, halfHeight + horizRadius, halfLength + horizRadius);
+            if (correction) applyLocalCorrection(correction);
+          }
+        }
+      }
+    }
+
+    if (this.terrain && typeof this.terrain.getHeightAt === 'function') {
+      const terrainHeight = this.terrain.getHeightAt(wagon.x, wagon.z);
+      if ((wagon.y ?? 0) < terrainHeight) {
+        wagon.y = terrainHeight;
+      }
+    }
+  }
+
   getControlKey(event) {
     if (!event) {
       return '';
@@ -804,16 +1052,25 @@ export class MyScene extends CGFscene {
 
     const deltaTime = this.lastUpdateTime === 0 ? 0 : (t - this.lastUpdateTime) / 1000;
     this.lastUpdateTime = t;
-    if (deltaTime > 0) {
-      this.updatePlayerBallControl(deltaTime);
+    // Detect actor changes and switch state if needed
+    if (this.actorChoice !== this._lastActorChoice) {
+      this._switchActiveActor(this._lastActorChoice, this.actorChoice);
+      this._lastActorChoice = this.actorChoice;
     }
+
+    if (deltaTime > 0) {
+      // Only route player input to the ball when it's the active actor
+      if (this.actorChoice === 'Ball') this.updatePlayerBallControl(deltaTime);
+    }
+
     this.physics?.step(deltaTime);
     // After physics, constrain ball against world objects before visual update
-    if (this.ballBody) {
+    if (this.ballBody && this.actorChoice === 'Ball') {
       this.constrainBallPosition(this.ballBody);
     }
+
     if (deltaTime > 0) {
-      this.updateBallAfterPhysics();
+      if (this.actorChoice === 'Ball') this.updateBallAfterPhysics();
     }
     this.clouds.update(deltaTime);
 
@@ -821,10 +1078,19 @@ export class MyScene extends CGFscene {
       this.grass.update(this.time);
     }
 
-    // Wagon physics + snap to terrain
-    this.wagon.update(deltaTime, this.keys);
-    if (this.terrain) {
-      this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
+    // Wagon physics + snap to terrain (only when active)
+    if (this.actorChoice === 'Wagon') {
+      this.wagon.update(deltaTime, this.keys);
+      if (this.terrain) {
+        this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
+      }
+      // constrain wagon against world geometry
+      this.constrainWagonPosition(this.wagon);
+      // Make camera follow wagon when it's active
+      if (this.camera && typeof this.camera.follow === 'function') {
+        const target = vec3.fromValues(this.wagon.x, this.wagon.y, this.wagon.z);
+        this.camera.follow(target, this.wagon.heading || 0);
+      }
     }
 
     if (this.cameraDebugEnabled && t - this.lastCameraDebugLogTime >= this.cameraDebugIntervalMs) {
@@ -879,12 +1145,12 @@ export class MyScene extends CGFscene {
     
     this.barn.display();
     this.barnFence.display();
-    this.ball.display();
+    if (this.actorChoice === 'Ball') this.ball.display();
     
     this.grass.display();
     this.flowers.display();
 
-    if (this.displayWagon) this.wagon.display();
+    if (this.actorChoice === 'Wagon') this.wagon.display();
 
     // ---- END Primitive drawing section
   }

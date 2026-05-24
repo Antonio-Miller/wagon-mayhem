@@ -21,7 +21,9 @@ export class MyInterface extends CGFinterface {
         this.gui.add(this.scene, 'displayAxis').name('Display Axis');
         this.gui.add(this.scene, 'sunEnabled').name('Sun On');
         this.gui.add(this.scene, 'timeOfDay', 0, 24).name('Time of Day').step(0.5);
-        this.gui.add(this.scene, 'displayWagon').name('Show Wagon');
+        // Choose active actor: Ball or Wagon
+        // default is set in the scene (this.scene.actorChoice)
+        this.gui.add(this.scene, 'actorChoice', ['Ball', 'Wagon']).name('Active Actor');
 
         // ── Keyboard state ───────────────────────────────────
         // Game keys: WASD (movement), P (pickup), L (drop), R (reset)
@@ -31,17 +33,17 @@ export class MyInterface extends CGFinterface {
         const self = this;
 
         document.onkeydown = function (ev) {
-            const k = (ev && ev.key) ? ev.key.toLowerCase() : '';
-            if (gameKeys.indexOf(k) !== -1) {
-                // Write the key state onto the scene for the wagon to read
-                if (self.scene) self.scene.keys[ev.code] = true;
-                // NOTE: WASD now drives the wagon exclusively.
-                // Camera movement uses mouse (orbit / zoom / pan via CGFinterface).
-        document.onkeydown = function(ev) {
             const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
             const code = ev && ev.code ? ev.code : '';
-            // Player movement keys + camera mode (Shift) handling
-            if (['w','a','s','d'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
+
+            if (gameKeys.indexOf(key) !== -1) {
+                if (self.scene) self.scene.keys[code] = true;
+            }
+            if (key === ' ' || code === 'Space') {
+                if (self.scene) self.scene.keys.Space = true;
+            }
+
+            if (['w', 'a', 's', 'd'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
                 if (self.scene && typeof self.scene.handleControlKeyDown === 'function') {
                     self.scene.handleControlKeyDown(ev);
                 }
@@ -55,13 +57,17 @@ export class MyInterface extends CGFinterface {
         };
 
         document.onkeyup = function (ev) {
-            const k = (ev && ev.key) ? ev.key.toLowerCase() : '';
-            if (gameKeys.indexOf(k) !== -1) {
-                if (self.scene) self.scene.keys[ev.code] = false;
-        document.onkeyup = function(ev) {
             const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
             const code = ev && ev.code ? ev.code : '';
-            if (['w','a','s','d'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
+
+            if (gameKeys.indexOf(key) !== -1) {
+                if (self.scene) self.scene.keys[code] = false;
+            }
+            if (key === ' ' || code === 'Space') {
+                if (self.scene) self.scene.keys.Space = false;
+            }
+
+            if (['w', 'a', 's', 'd'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
                 if (self.scene && typeof self.scene.handleControlKeyUp === 'function') {
                     self.scene.handleControlKeyUp(ev);
                 }

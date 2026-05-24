@@ -58,6 +58,7 @@ export class MyWagon {
     this.wheelAngle = 0;  // cumulative roll
 
     // ═══════════════════ Primitives ═══════════════════
+    // primitives (kept in fields so they can be unloaded)
     this.cube  = new MyUnitCube(scene);
     this.axle  = new MyCylinder(scene, 10, this.axleFullWidth, 0.10, 0.10, true);
     this.wheel = new MyWheel(scene, this.wheelRadius, 0.15, 0.30, 0.40, 8);
@@ -84,6 +85,7 @@ export class MyWagon {
     this.metalMat.setDiffuse(0.40, 0.40, 0.45, 1);
     this.metalMat.setSpecular(0.55, 0.55, 0.60, 1);
     this.metalMat.setShininess(50);
+    this._primitivesLoaded = true;
   }
 
   // ────────────────────────────────────────────────────────
@@ -99,13 +101,26 @@ export class MyWagon {
     const FRICTION     = 5.0;   // passive slow-down
 
     // ── Acceleration / braking ──
-    if (keys["KeyW"])      this.speed = Math.min(this.speed + ACCEL * deltaTime, MAX_SPEED);
-    else if (keys["KeyS"]) this.speed = Math.max(this.speed - DECEL * deltaTime, 0);
-    else                   this.speed = Math.max(this.speed - FRICTION * deltaTime, 0);
+    // SPACE applies an immediate brake (while held) that reduces speed toward 0
+    if (keys["Space"]) {
+      if (this.speed > 0) this.speed = Math.max(this.speed - DECEL * deltaTime, 0);
+      else this.speed = Math.min(this.speed + DECEL * deltaTime, 0);
+    }
+    // W accelerates forward, S decelerates and can go into negative (reverse)
+    else if (keys["KeyW"]) {
+      this.speed = Math.min(this.speed + ACCEL * deltaTime, MAX_SPEED);
+    } else if (keys["KeyS"]) {
+      this.speed = Math.max(this.speed - DECEL * deltaTime, -MAX_SPEED);
+    } else {
+      // Friction: bring speed toward zero from either positive or negative
+      if (this.speed > 0) this.speed = Math.max(this.speed - FRICTION * deltaTime, 0);
+      else this.speed = Math.min(this.speed + FRICTION * deltaTime, 0);
+    }
 
     // ── Steering ──
-    if (keys["KeyA"])      this.steerAngle = Math.max(this.steerAngle - STEER_RATE * deltaTime, -MAX_STEER);
-    else if (keys["KeyD"]) this.steerAngle = Math.min(this.steerAngle + STEER_RATE * deltaTime,  MAX_STEER);
+    // Note: A should steer left, D should steer right. Swap signs accordingly.
+    if (keys["KeyA"])      this.steerAngle = Math.min(this.steerAngle + STEER_RATE * deltaTime,  MAX_STEER);
+    else if (keys["KeyD"]) this.steerAngle = Math.max(this.steerAngle - STEER_RATE * deltaTime, -MAX_STEER);
     else {
       // auto-return
       if      (this.steerAngle > 0) this.steerAngle = Math.max(this.steerAngle - STEER_RETURN * deltaTime, 0);
@@ -114,7 +129,8 @@ export class MyWagon {
 
     // ── Heading (bicycle model) ──
     const wheelBase = Math.abs(this.frontAxleZ - this.rearAxleZ);
-    if (this.speed > 0.001) {
+    // Allow steering while moving forward or backward
+    if (Math.abs(this.speed) > 0.001) {
       this.heading += Math.tan(this.steerAngle) * (this.speed / wheelBase) * deltaTime;
     }
 
@@ -186,6 +202,7 @@ export class MyWagon {
   //  Cover — half-cylinder canopy over the rear half
   // ────────────────────────────────────────────────────────
   displayCover() {
+    if (!this._primitivesLoaded || !this.cover) return;
     this.scene.pushMatrix();
     // Position at top of the rear walls
     this.scene.translate(0, this.floorY + this.floorThick + this.wallHeight, -this.bodyLength / 4);
@@ -197,6 +214,7 @@ export class MyWagon {
   //  Single wheel helper — stands the flat disc up
   // ────────────────────────────────────────────────────────
   displayWheel(roll, isLeft) {
+    if (!this._primitivesLoaded || !this.wheel) return;
     this.scene.pushMatrix();
     // Stand the flat XZ-disc up into the YZ-plane
     // ±90° around Z mirrors the outer face to the correct side
@@ -212,6 +230,8 @@ export class MyWagon {
   // ────────────────────────────────────────────────────────
   displayAxle(z, steerable) {
     const halfW = this.axleFullWidth / 2;
+
+    if (!this._primitivesLoaded || !this.axle) return;
 
     this.scene.pushMatrix();
     this.scene.translate(0, this.axleY, z);
@@ -267,6 +287,8 @@ export class MyWagon {
   //  Display — root of the wagon scene graph
   // ────────────────────────────────────────────────────────
   display() {
+    if (!this._primitivesLoaded) return;
+
     this.scene.pushMatrix();
 
     // World position + heading
@@ -279,5 +301,46 @@ export class MyWagon {
     this.displayAxle(this.frontAxleZ, true);     // front — steerable
 
     this.scene.popMatrix();
+  }
+
+  unloadModel() {
+    // null heavy primitives and mark unloaded
+    this.cube = null;
+    this.axle = null;
+    this.wheel = null;
+    this.cover = null;
+    this.woodMat = null;
+    this.darkWoodMat = null;
+    this.metalMat = null;
+    this._primitivesLoaded = false;
+  }
+
+  loadModel() {
+    if (this._primitivesLoaded) return;
+    // recreate primitives and materials
+    this.cube  = new MyUnitCube(this.scene);
+    this.axle  = new MyCylinder(this.scene, 10, this.axleFullWidth, 0.10, 0.10, true);
+    this.wheel = new MyWheel(this.scene, this.wheelRadius, 0.15, 0.30, 0.40, 8);
+    this.cover = new MyWagonCover(this.scene, this.bodyWidth, this.bodyLength / 2, 16, 8, 5);
+
+    this.woodMat = new CGFappearance(this.scene);
+    this.woodMat.setAmbient(0.40, 0.26, 0.10, 1);
+    this.woodMat.setDiffuse(0.62, 0.42, 0.18, 1);
+    this.woodMat.setSpecular(0.15, 0.10, 0.05, 1);
+    this.woodMat.setShininess(12);
+
+    this.darkWoodMat = new CGFappearance(this.scene);
+    this.darkWoodMat.setAmbient(0.22, 0.13, 0.05, 1);
+    this.darkWoodMat.setDiffuse(0.40, 0.24, 0.10, 1);
+    this.darkWoodMat.setSpecular(0.10, 0.08, 0.04, 1);
+    this.darkWoodMat.setShininess(8);
+
+    this.metalMat = new CGFappearance(this.scene);
+    this.metalMat.setAmbient(0.20, 0.20, 0.22, 1);
+    this.metalMat.setDiffuse(0.40, 0.40, 0.45, 1);
+    this.metalMat.setSpecular(0.55, 0.55, 0.60, 1);
+    this.metalMat.setShininess(50);
+
+    this._primitivesLoaded = true;
   }
 }
