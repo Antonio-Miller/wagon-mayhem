@@ -98,6 +98,18 @@ export class MyWagon {
     this.metalMat.setSpecular(0.55, 0.55, 0.60, 1);
     this.metalMat.setShininess(50);
     this._primitivesLoaded = true;
+
+    // Horse physical hitch state
+    this.horseHeading = this.heading; // world radians
+    this.horseX = this.x;
+    this.horseY = this.y;
+    this.horseZ = this.z + this.horseOffsetZ; // initial place in front
+    this.horseLeadDist = this.horseOffsetZ; // distance from wagon center to horse centre
+    this.horseRearOffset = 1.0; // distance from horse centre to hitch point (rear of horse)
+    this.horseTurnSpeed = 2.0; // responsiveness when turning (reduced for smoothness)
+    this.wagonFollowSpeed = 1.8; // how quickly wagon aligns to hitch (reduced)
+    this.maxHorseAngularVel = 1.2; // rad/s - cap per-frame horse rotation
+    this.maxWagonAngularVel = 1.0; // rad/s - cap per-frame wagon rotation
   }
 
   // ────────────────────────────────────────────────────────
@@ -141,16 +153,47 @@ export class MyWagon {
       else if (this.steerAngle < 0) this.steerAngle = Math.min(this.steerAngle + STEER_RETURN * deltaTime, 0);
     }
 
-    // ── Heading (bicycle model) ──
-    const wheelBase = Math.abs(this.frontAxleZ - this.rearAxleZ);
-    // Allow steering while moving forward or backward
-    if (Math.abs(this.speed) > 0.001) {
-      this.heading += Math.tan(this.steerAngle) * (this.speed / wheelBase) * deltaTime;
-    }
-
-    // ── Position ──
+    // ── Position (wagon translates forward) ──
     this.x += Math.sin(this.heading) * this.speed * deltaTime;
     this.z += Math.cos(this.heading) * this.speed * deltaTime;
+
+    // Helper: shortest angular difference
+    const shortestAngleDiff = (a, b) => {
+      let d = b - a;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      return d;
+    };
+
+    // Update horse heading: horse anticipates steering input and smoothly turns
+    const desiredHorseHeading = this.heading + (this.steerAngle || 0) * 1.5;
+    const horseBlend = 1 - Math.exp(-this.horseTurnSpeed * Math.max(0, deltaTime));
+    const horseAngleDiff = shortestAngleDiff(this.horseHeading, desiredHorseHeading);
+    const desiredHorseDelta = horseAngleDiff * horseBlend;
+    const maxHorseDelta = (this.maxHorseAngularVel || 10) * Math.max(0, deltaTime);
+    const appliedHorseDelta = Math.sign(desiredHorseDelta) * Math.min(Math.abs(desiredHorseDelta), maxHorseDelta);
+    this.horseHeading = this.horseHeading + appliedHorseDelta;
+
+    // Compute horse world position ahead of the wagon along the horse forward vector
+    const horseFwdX = Math.sin(this.horseHeading);
+    const horseFwdZ = Math.cos(this.horseHeading);
+    this.horseX = this.x + horseFwdX * this.horseLeadDist;
+    this.horseZ = this.z + horseFwdZ * this.horseLeadDist;
+    this.horseY = this.scene && this.scene.terrain ? this.scene.terrain.getHeightAt(this.horseX, this.horseZ) : this.y;
+
+    // Hitch point is at the rear of the horse
+    const hitchX = this.horseX - horseFwdX * this.horseRearOffset;
+    const hitchZ = this.horseZ - horseFwdZ * this.horseRearOffset;
+
+    // Wagon heading should point toward the hitch point (smoothed)
+    const desiredWagonHeading = Math.atan2(hitchX - this.x, hitchZ - this.z);
+    // Follow speed scales with wagon speed (faster motion -> slightly quicker articulation)
+    const followFactor = 1 - Math.exp(-this.wagonFollowSpeed * (1 + Math.abs(this.speed) * 0.1) * Math.max(0, deltaTime));
+    const wagonAngleDiff = shortestAngleDiff(this.heading, desiredWagonHeading);
+    const desiredWagonDelta = wagonAngleDiff * followFactor;
+    const maxWagonDelta = (this.maxWagonAngularVel || 10) * Math.max(0, deltaTime);
+    const appliedWagonDelta = Math.sign(desiredWagonDelta) * Math.min(Math.abs(desiredWagonDelta), maxWagonDelta);
+    this.heading = this.heading + appliedWagonDelta;
 
     // ── Wheel roll ──
       // Use the standard angular-speed formula ω = v / r, but apply a small gear-based scale
@@ -422,16 +465,6 @@ export class MyWagon {
       this.scene.scale(3.0, 0.22, 0.22);
       this.cube.display();
       this.scene.popMatrix();
-
-      if (this.horseModel) {
-        this.scene.pushMatrix();
-        this.scene.translate(0, 0, this.horseOffsetZ);
-        this.scene.rotate(0, 0, 1, 0);
-        const s = this.horseModel.scale || 1.0;
-        this.scene.scale(s, s, s);
-        this.horseModel.display();
-        this.scene.popMatrix();
-      }
     }
 
     this.scene.popMatrix();
@@ -459,6 +492,18 @@ export class MyWagon {
     this.displayAxle(this.frontAxleZ, true);     // front — steerable
 
     this.scene.popMatrix();
+
+    // Render horse in world-space so it can have independent heading and articulation
+    if (this.horseModel) {
+      this.scene.pushMatrix();
+      this.scene.translate(this.horseX, this.horseY, this.horseZ);
+      // rotate so model's forward aligns with heading convention (0 -> +Z)
+      this.scene.rotate(this.horseHeading, 0, 1, 0);
+      const s = this.horseModel.scale || 1.0;
+      this.scene.scale(s, s, s);
+      this.horseModel.display();
+      this.scene.popMatrix();
+    }
   }
 
   unloadModel() {

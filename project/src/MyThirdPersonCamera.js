@@ -7,9 +7,9 @@ function clamp(value, min, max) {
 export class MyThirdPersonCamera extends CGFcamera {
   constructor(fov, near, far, position, target) {
     super(fov, near, far, position, target);
-    this.followDistance = 24;
-    this.followHeight = 9;
-    this.lookHeight = 4 ;
+    this.followDistance = 32;
+    this.followHeight = 12;
+    this.lookHeight = 5;
     this.smoothing = 0.18;
   }
 

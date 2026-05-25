@@ -1238,7 +1238,7 @@ export class MyScene extends CGFscene {
     this.clouds.display();
     this.terrain.display();
     
-    //this.barn.display();
+    this.barn.display();
     this.barnFence.display();
     if (this.actorChoice === 'Ball') this.ball.display();
     
