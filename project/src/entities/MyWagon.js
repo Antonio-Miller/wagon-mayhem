@@ -30,8 +30,10 @@ import { MyWagonCover } from "./MyWagonCover.js";
  * ╚══════════════════════════════════════════════════════════╝
  */
 export class MyWagon {
-  constructor(scene) {
+  constructor(scene, gameState = null) {
     this.scene = scene;
+    this.gameState = gameState; // Reference to GameState for health tracking
+    this.activeCollisionContacts = new Set();
 
     // ═══════════════════ Dimensions ═══════════════════
     // Scaled to match scene objects (rocks ≈ 2–5 u, trees ≈ 19 u tall)
@@ -116,6 +118,13 @@ export class MyWagon {
   //  Physics / Controls
   // ────────────────────────────────────────────────────────
   update(deltaTime, keys) {
+    if (this.gameState?.isGameOver()) {
+      if (keys?.KeyR) {
+        this.reset();
+      }
+      return;
+    }
+
     const ACCEL        = 15.0;  // units/s²  (scaled to larger world)
     const DECEL        = 25.0;  // braking
     const MAX_SPEED    = 15.0;  // base top speed for gear 1
@@ -204,15 +213,130 @@ export class MyWagon {
       const spinScale = (this.wheelSpinBaseScale || 1.0) + (this.wheelSpinPerGear || 0.25) * gearExtra;
       this.wheelAngle += (this.speed / Math.max(1e-6, this.wheelRadius)) * deltaTime * spinScale;
 
+    // ── Update GameState cooldown ──
+    if (this.gameState) {
+      this.gameState.update(deltaTime);
+    }
+
     // ── Instant reset (R key) ──
     if (keys["KeyR"]) {
-      this.x = 0; this.z = 0; this.y = 0;
-      this.heading = 0; this.speed = 0;
-      this.steerAngle = 0; this.wheelAngle = 0;
-      this.terrainAlignmentMatrix = null;
-      this.smoothedTerrainUp = null;
-      this.smoothedTerrainForward = null;
+      this.reset();
     }
+  }
+
+  /**
+   * Reset wagon to starting state (also resets GameState if available).
+   */
+  reset() {
+    this.x = 0;
+    this.z = 0;
+    this.y = 0;
+    this.heading = 0;
+    this.speed = 0;
+    this.steerAngle = 0;
+    this.wheelAngle = 0;
+    this.terrainAlignmentMatrix = null;
+    this.smoothedTerrainUp = null;
+    this.smoothedTerrainForward = null;
+    this.activeCollisionContacts.clear();
+
+    // Reset GameState as well
+    if (this.gameState) {
+      this.gameState.reset();
+    }
+  }
+
+  /**
+   * Check for collisions with obstacles and apply damage via GameState.
+   * Damageable: rocks, trees, flowers, fence posts
+   * Safe (no damage): barn
+   */
+  checkCollisions(obstacles = {}, sceneData = {}) {
+    if (!this.gameState) return;
+
+    const wagonRadius = Math.max(this.bodyWidth, this.bodyLength) / 2 + 1.5;
+    const collisionDamage = 10;
+    const currentContacts = new Set();
+
+    const registerContact = (contactId) => {
+      currentContacts.add(contactId);
+      if (!this.activeCollisionContacts.has(contactId)) {
+        this.gameState.damageWagon(collisionDamage);
+      }
+    };
+
+    // ════════════════════════════════════════
+    // Check ROCKS
+    // ════════════════════════════════════════
+    if (obstacles.rocks?.rocks) {
+      for (let index = 0; index < obstacles.rocks.rocks.length; index++) {
+        const rockEntry = obstacles.rocks.rocks[index];
+        if (rockEntry.x === undefined || rockEntry.z === undefined) continue;
+
+        const dx = rockEntry.x - this.x;
+        const dz = rockEntry.z - this.z;
+        const dist = Math.hypot(dx, dz);
+        
+        // Use rock scale as collision radius (average of scales)
+        const rockRadius = (rockEntry.scaleX + rockEntry.scaleY + rockEntry.scaleZ) / 3 * 0.85;
+        const collisionThreshold = wagonRadius + rockRadius;
+
+        if (dist < collisionThreshold) {
+          registerContact(`rock-${index}`);
+        }
+      }
+    }
+
+    // ════════════════════════════════════════
+    // Check PINE TREES
+    // ════════════════════════════════════════
+    if (obstacles.trees?.trees) {
+      for (let index = 0; index < obstacles.trees.trees.length; index++) {
+        const treeEntry = obstacles.trees.trees[index];
+        if (!treeEntry.placed || treeEntry.x === undefined || treeEntry.z === undefined) continue;
+
+        const dx = treeEntry.x - this.x;
+        const dz = treeEntry.z - this.z;
+        const dist = Math.hypot(dx, dz);
+        
+        // Use foliage radius for collision
+        const treeRadius = treeEntry.foliageRadius || 6;
+        const collisionThreshold = wagonRadius + treeRadius;
+
+        if (dist < collisionThreshold) {
+          registerContact(`tree-${index}`);
+        }
+      }
+    }
+
+    // ════════════════════════════════════════
+    // Check BARN FENCE POSTS
+    // ════════════════════════════════════════
+    if (obstacles.barnFence?.fencePosts) {
+      for (let index = 0; index < obstacles.barnFence.fencePosts.length; index++) {
+        const post = obstacles.barnFence.fencePosts[index];
+        if (post.x === undefined || post.z === undefined) continue;
+
+        const dx = post.x - this.x;
+        const dz = post.z - this.z;
+        const dist = Math.hypot(dx, dz);
+        
+        // Post radius for collision
+        const postRadius = obstacles.barnFence.postRadius || 0.35;
+        const collisionThreshold = wagonRadius + postRadius + 0.5;
+
+        if (dist < collisionThreshold) {
+          registerContact(`fence-${index}`);
+        }
+      }
+    }
+
+    this.activeCollisionContacts = currentContacts;
+
+    // ════════════════════════════════════════
+    // BARN is SAFE - no damage
+    // ════════════════════════════════════════
+    // No damage from barn collision
   }
 
   updateTerrainAlignment(terrain, deltaTime = 0) {

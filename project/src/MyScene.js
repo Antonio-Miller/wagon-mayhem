@@ -12,6 +12,7 @@ import { MyBarnFence } from "./entities/MyBarnFence.js";
 import { MyRollingBall } from "./entities/MyRollingBall.js";
 import { MyPhysicsEngine } from "./physics/MyPhysicsEngine.js";
 import { MyWagon } from "./entities/MyWagon.js";
+import { GameState } from "./GameState.js";
 
 /**
  * MyScene
@@ -36,6 +37,9 @@ export class MyScene extends CGFscene {
     // Active actor choice: 'Ball' or 'Wagon' (default: Wagon)
     this.actorChoice = 'Wagon';
     this._lastActorChoice = this.actorChoice;
+    
+    // Game state manager
+    this.gameState = new GameState();
   }
 
   _switchActiveActor(prev, next) {
@@ -160,7 +164,7 @@ export class MyScene extends CGFscene {
     });
     this.registerPhysicsBodies();
     this.initPlayerBall();
-    this.wagon = new MyWagon(this);
+    this.wagon = new MyWagon(this, this.gameState);
     // Ensure wagon initially spawns at the ball coords
     if (this.ballBody && this.wagon) {
       this.wagon.x = this.ballBody.position[0];
@@ -1175,12 +1179,22 @@ export class MyScene extends CGFscene {
       if (this.terrain) {
         this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
       }
+
+      // Check damage before world constraints push the wagon out of contact
+      this.wagon.checkCollisions({
+        rocks: this.rocks,
+        trees: this.pineTrees,
+        flowers: this.flowers,
+        barnFence: this.barnFence,
+      });
+
       // constrain wagon against world geometry
       this.constrainWagonPosition(this.wagon);
       if (this.terrain) {
         this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
       }
       this.wagon.updateTerrainAlignment(this.terrain, deltaTime);
+      
       // Make camera follow wagon when it's active
       if (this.camera && typeof this.camera.follow === 'function') {
         const target = vec3.fromValues(this.wagon.x, this.wagon.y, this.wagon.z);
@@ -1248,5 +1262,113 @@ export class MyScene extends CGFscene {
     if (this.actorChoice === 'Wagon') this.wagon.display();
 
     // ---- END Primitive drawing section
+    
+    // Render UI overlay
+    this.renderGameUI();
+  }
+
+  /**
+   * Create overlay canvas for UI rendering (separate from WebGL canvas)
+   */
+  ensureUIOverlay() {
+    if (this._uiOverlay) return;
+
+    const glCanvas = this.gl.canvas;
+    const overlay = document.createElement('canvas');
+    overlay.id = 'ui-overlay';
+    overlay.width = glCanvas.width;
+    overlay.height = glCanvas.height;
+    overlay.style.position = 'absolute';
+    overlay.style.top = glCanvas.offsetTop + 'px';
+    overlay.style.left = glCanvas.offsetLeft + 'px';
+    overlay.style.pointerEvents = 'none';
+    overlay.style.zIndex = '100';
+
+    glCanvas.parentNode.insertBefore(overlay, glCanvas.nextSibling);
+    this._uiOverlay = overlay;
+    this._uiContext = overlay.getContext('2d');
+  }
+
+  /**
+   * Render game UI overlay (health display, game over message, etc.)
+   */
+  renderGameUI() {
+    if (!this.gameState) return;
+
+    this.ensureUIOverlay();
+    const ctx = this._uiContext;
+    const canvas = this._uiOverlay;
+    
+    if (!ctx) return;
+
+    // Clear overlay
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // ═══════════════════════════════════════════════════════
+    // Health Bar (Bottom-Left)
+    // ═══════════════════════════════════════════════════════
+    const barX = 20;
+    const barY = canvas.height - 50;
+    const barWidth = 200;
+    const barHeight = 30;
+    const healthPercent = this.gameState.getHealthPercent();
+    const healthBarWidth = (healthPercent / 100) * barWidth;
+
+    // Background (semi-transparent dark box)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
+
+    // Health bar color: Green -> Yellow -> Red
+    if (healthPercent > 50) {
+      ctx.fillStyle = `rgb(100, 255, 100)`;
+    } else if (healthPercent > 25) {
+      ctx.fillStyle = `rgb(255, 255, 50)`;
+    } else {
+      ctx.fillStyle = `rgb(255, 50, 50)`;
+    }
+
+    // Draw health bar
+    ctx.fillRect(barX, barY, healthBarWidth, barHeight);
+
+    // Border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+    // Health text
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      `${Math.ceil(this.gameState.wagonHealth)} / ${this.gameState.wagonMaxHealth}`,
+      barX + barWidth / 2,
+      barY + barHeight / 2 + 5
+    );
+
+    // ═══════════════════════════════════════════════════════
+    // Game Over Message
+    // ═══════════════════════════════════════════════════════
+    if (this.gameState.isGameOver()) {
+      // Semi-transparent overlay
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Main message
+      ctx.fillStyle = 'rgba(255, 50, 50, 1)';
+      ctx.font = 'bold 72px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 80);
+
+      // Subtitle
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = 'bold 28px Arial';
+      ctx.fillText('The wagon was destroyed!', canvas.width / 2, canvas.height / 2);
+
+      // Instructions
+      ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
+      ctx.font = '20px Arial';
+      ctx.fillText('Press R to reset the game', canvas.width / 2, canvas.height / 2 + 80);
+    }
   }
 }
