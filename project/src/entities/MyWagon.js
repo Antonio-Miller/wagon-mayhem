@@ -1,6 +1,7 @@
 import { CGFappearance } from "../../../lib/CGF.js";
 import { MyUnitCube } from "../primitives/MyUnitCube.js";
 import { MyCylinder } from "../primitives/MyCylinder.js";
+import { MyOBJModel } from "../MyOBJModel.js";
 import { MyWheel } from "./MyWheel.js";
 import { MyWagonCover } from "./MyWagonCover.js";
 
@@ -47,6 +48,7 @@ export class MyWagon {
     this.frontAxleZ    =  this.bodyLength * 0.32;       // front axle Z position
     this.axleFullWidth = this.bodyWidth + 1.2;          // total visible axle span
     this.tongueLength  = 7.5;                           // tongue extends forward from front axle
+    this.horseOffsetZ  = this.tongueLength + 1.75;
 
     // ═══════════════════ Kinematic state ═══════════════════
     this.x = 0;
@@ -85,6 +87,9 @@ export class MyWagon {
     this.darkWoodMat.setDiffuse(0.40, 0.24, 0.10, 1);
     this.darkWoodMat.setSpecular(0.10, 0.08, 0.04, 1);
     this.darkWoodMat.setShininess(8);
+
+    // Horse — attached to the front assembly
+    this.horseModel = new MyOBJModel(scene, '/project/models/horse.obj', 1.7);
 
     // Metal — axles
     this.metalMat = new CGFappearance(scene);
@@ -417,6 +422,16 @@ export class MyWagon {
       this.scene.scale(3.0, 0.22, 0.22);
       this.cube.display();
       this.scene.popMatrix();
+
+      if (this.horseModel) {
+        this.scene.pushMatrix();
+        this.scene.translate(0, 0, this.horseOffsetZ);
+        this.scene.rotate(0, 0, 1, 0);
+        const s = this.horseModel.scale || 1.0;
+        this.scene.scale(s, s, s);
+        this.horseModel.display();
+        this.scene.popMatrix();
+      }
     }
 
     this.scene.popMatrix();
@@ -454,6 +469,7 @@ export class MyWagon {
     this.cover = null;
     this.woodMat = null;
     this.darkWoodMat = null;
+    this.horseModel = null;
     this.metalMat = null;
     this._primitivesLoaded = false;
   }
@@ -477,6 +493,8 @@ export class MyWagon {
     this.darkWoodMat.setDiffuse(0.40, 0.24, 0.10, 1);
     this.darkWoodMat.setSpecular(0.10, 0.08, 0.04, 1);
     this.darkWoodMat.setShininess(8);
+
+    this.horseModel = new MyOBJModel(this.scene, '/project/models/horse.obj', 1.7);
 
     this.metalMat = new CGFappearance(this.scene);
     this.metalMat.setAmbient(0.20, 0.20, 0.22, 1);

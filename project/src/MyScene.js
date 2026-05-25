@@ -121,28 +121,28 @@ export class MyScene extends CGFscene {
     ];
     this.terrain.setPathUniforms(pathCorners, pathWidth / 2, [0.72, 0.54, 0.36], 0.92);
 
-    const barnAreaCenterX = 112.65;
-    const barnAreaCenterZ = -220.85;
+    this.barnAreaCenterX = 112.65;
+    this.barnAreaCenterZ = -220.85;
     const barnAreaRadius = 90;
     const barnFenceRadius = 75;
     this.terrain.setCircularArea(
-      barnAreaCenterX,
-      barnAreaCenterZ,
+      this.barnAreaCenterX,
+      this.barnAreaCenterZ,
       barnAreaRadius,
       [0.72, 0.54, 0.36],
       0.92,
       10.0
     );
 
-    this.barn = new MyBarn(this, this.terrain, barnAreaCenterX, barnAreaCenterZ, 50, 52, 28, 50);
+    this.barn = new MyBarn(this, this.terrain, this.barnAreaCenterX, this.barnAreaCenterZ, 50, 52, 28, 50);
 
     // Create barn fence - fully closed
     const fenceOpenings = [];
     this.barnFence = new MyBarnFence(
       this,
       this.terrain,
-      barnAreaCenterX,
-      barnAreaCenterZ,
+      this.barnAreaCenterX,
+      this.barnAreaCenterZ,
       barnFenceRadius,
       0.35, // post radius (thinner)
       4.2,  // post height
@@ -1238,7 +1238,7 @@ export class MyScene extends CGFscene {
     this.clouds.display();
     this.terrain.display();
     
-    this.barn.display();
+    //this.barn.display();
     this.barnFence.display();
     if (this.actorChoice === 'Ball') this.ball.display();
     
