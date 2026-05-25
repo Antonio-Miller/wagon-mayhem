@@ -60,6 +60,9 @@ export class MyWagon {
     this.smoothedTerrainUp = null;
     this.smoothedTerrainForward = null;
     this.terrainAlignmentSmoothing = 8.0;
+      // Wheel spin tuning
+      this.wheelSpinBaseScale = 1.0; // baseline multiplier for wheel angular speed
+      this.wheelSpinPerGear = 0.25;  // additional multiplier per extra gear (gear2 adds 0.25)
 
     // ═══════════════════ Primitives ═══════════════════
     // primitives (kept in fields so they can be unloaded)
@@ -145,7 +148,13 @@ export class MyWagon {
     this.z += Math.cos(this.heading) * this.speed * deltaTime;
 
     // ── Wheel roll ──
-    this.wheelAngle += (this.speed / this.wheelRadius) * deltaTime;
+      // Use the standard angular-speed formula ω = v / r, but apply a small gear-based scale
+      // so wheels visibly spin correctly in higher gears.
+      // Determine current gear from input keys (forward or reverse depending on sign)
+      const gear = (this.speed >= 0) ? (keys?.wagonForwardGear ?? 1) : (keys?.wagonReverseGear ?? 1);
+      const gearExtra = Math.max(0, (gear || 1) - 1);
+      const spinScale = (this.wheelSpinBaseScale || 1.0) + (this.wheelSpinPerGear || 0.25) * gearExtra;
+      this.wheelAngle += (this.speed / Math.max(1e-6, this.wheelRadius)) * deltaTime * spinScale;
 
     // ── Instant reset (R key) ──
     if (keys["KeyR"]) {
