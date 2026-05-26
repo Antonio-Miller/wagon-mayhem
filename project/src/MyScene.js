@@ -207,6 +207,9 @@ export class MyScene extends CGFscene {
             position: vec3.fromValues(hay.x, 100 + Math.random() * 50, hay.z),
             velocity: vec3.fromValues(0, 0, 0),
             gravityScale: 1,
+            linearDrag: 0.08,
+            groundResistance: 2.2,
+            restVelocityThreshold: 0.015,
             groundHeightFn: () => {
               if (this.terrain?.getHeightAt) {
                 const terrainY = this.terrain.getHeightAt(hay.x, hay.z);
@@ -215,7 +218,9 @@ export class MyScene extends CGFscene {
               return 0;
             },
             onStep: (body) => {
+              hay.x = body.position[0];
               hay.y = body.position[1];
+              hay.z = body.position[2];
             },
           });
 
@@ -1090,7 +1095,7 @@ export class MyScene extends CGFscene {
     }
   }
 
-  findNearestAvailableHayBale(maxDistance = 8.5) {
+  findNearestAvailableHayBale(maxDistance = 35.0) {
     if (!this.wagon || !this.haySet?.hay) {
       return null;
     }
@@ -1234,6 +1239,65 @@ export class MyScene extends CGFscene {
     if (this.actionInput.drop) {
       this.dropHayBale();
       this.actionInput.drop = false;
+    }
+  }
+
+  updateHayWagonCollisions(deltaTime) {
+    if (!this.wagon || !this.haySet?.hay) {
+      return;
+    }
+
+    const wagonRadius = Math.max(this.wagon.bodyWidth, this.wagon.bodyLength) / 2 + 0.8;
+    const wagonSpeed = Math.abs(this.wagon.speed || 0);
+    const forwardX = Math.sin(this.wagon.heading || 0);
+    const forwardZ = Math.cos(this.wagon.heading || 0);
+    const terrainY = this.terrain?.getHeightAt ? this.terrain.getHeightAt(this.wagon.x, this.wagon.z) : 0;
+
+    for (const hay of this.haySet.hay) {
+      if (!hay || hay.collected || !hay.bale?.body || hay.bale.carried) {
+        continue;
+      }
+
+      hay.pushCooldown = Math.max(0, (hay.pushCooldown || 0) - deltaTime);
+      if (hay.pushCooldown > 0) {
+        continue;
+      }
+
+      const body = hay.bale.body;
+      const hx = body.position[0];
+      const hz = body.position[2];
+      const dx = hx - this.wagon.x;
+      const dz = hz - this.wagon.z;
+      const distance = Math.hypot(dx, dz);
+      const hayRadius = Math.max(2.5, hay.scale * 0.45);
+      const collisionThreshold = wagonRadius + hayRadius;
+
+      if (distance >= collisionThreshold) {
+        continue;
+      }
+
+      let pushX = dx;
+      let pushZ = dz;
+      if (distance < 1e-4) {
+        pushX = forwardX;
+        pushZ = forwardZ;
+      } else {
+        pushX /= distance;
+        pushZ /= distance;
+      }
+
+      const separation = collisionThreshold - distance + 0.15;
+      const impulse = Math.max(3.0, wagonSpeed * 2.2 + separation * 4.5);
+
+      body.position[0] = this.wagon.x + pushX * (collisionThreshold + 0.15);
+      body.position[1] = Math.max(body.position[1], terrainY + 1.0);
+      body.position[2] = this.wagon.z + pushZ * (collisionThreshold + 0.15);
+      body.velocity[0] = pushX * impulse + forwardX * wagonSpeed * 0.75;
+      body.velocity[1] = Math.max(body.velocity[1], 0.0);
+      body.velocity[2] = pushZ * impulse + forwardZ * wagonSpeed * 0.75;
+      body.active = true;
+      body.settled = false;
+      hay.pushCooldown = 0.2;
     }
   }
 
@@ -1400,6 +1464,8 @@ export class MyScene extends CGFscene {
         flowers: this.flowers,
         barnFence: this.barnFence,
       });
+
+      this.updateHayWagonCollisions(deltaTime);
 
       // constrain wagon against world geometry
       this.constrainWagonPosition(this.wagon);
