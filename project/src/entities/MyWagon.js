@@ -112,6 +112,35 @@ export class MyWagon {
     this.wagonFollowSpeed = 1.8; // how quickly wagon aligns to hitch (reduced)
     this.maxHorseAngularVel = 1.2; // rad/s - cap per-frame horse rotation
     this.maxWagonAngularVel = 1.0; // rad/s - cap per-frame wagon rotation
+    this.carriedHayBales = [];
+  }
+
+  setCarriedHayBales(hayBales) {
+    this.carriedHayBales = Array.isArray(hayBales) ? hayBales : [];
+  }
+
+  displayCarriedHayBales() {
+    if (!Array.isArray(this.carriedHayBales) || this.carriedHayBales.length === 0) {
+      return;
+    }
+
+    const cargoY = this.floorY + this.floorThick + 0.75;
+    const slots = [
+      { x: -1.35, z: -0.75, rotationY: 0.18 },
+      { x: 1.35, z: 0.75, rotationY: -0.22 },
+    ];
+
+    for (let i = 0; i < this.carriedHayBales.length && i < slots.length; i++) {
+      const hay = this.carriedHayBales[i];
+      if (!hay?.bale) continue;
+
+      const slot = slots[i];
+      // Keep hay at its original size (scaleMultiplier: 1.0)
+      hay.bale.displayAtPosition(slot.x, cargoY, slot.z, {
+        rotationY: slot.rotationY,
+        scaleMultiplier: 1.0,
+      });
+    }
   }
 
   // ────────────────────────────────────────────────────────
@@ -614,6 +643,7 @@ export class MyWagon {
     this.displayCover();
     this.displayAxle(this.rearAxleZ,  false);   // rear  — fixed
     this.displayAxle(this.frontAxleZ, true);     // front — steerable
+    this.displayCarriedHayBales();
 
     this.scene.popMatrix();
 

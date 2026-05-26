@@ -36,6 +36,13 @@ export class MyScene extends CGFscene {
       w: { pressed: false, lastReleaseTime: -Infinity, gear: 1 },
       s: { pressed: false, lastReleaseTime: -Infinity, gear: 1 },
     };
+    this.actionInput = {
+      pickup: false,
+      drop: false,
+    };
+    this.carriedHayBales = [];
+    this.maxCarriedHayBales = 2;
+    this.barnDropSlot = 0;
     // Active actor choice: 'Ball' or 'Wagon' (default: Wagon)
     this.actorChoice = 'Wagon';
     this._lastActorChoice = this.actorChoice;
@@ -167,6 +174,9 @@ export class MyScene extends CGFscene {
     this.registerPhysicsBodies();
     this.initPlayerBall();
     this.wagon = new MyWagon(this, this.gameState);
+    if (this.wagon && typeof this.wagon.setCarriedHayBales === 'function') {
+      this.wagon.setCarriedHayBales(this.carriedHayBales);
+    }
     // Ensure wagon initially spawns at the ball coords
     if (this.ballBody && this.wagon) {
       this.wagon.x = this.ballBody.position[0];
@@ -213,6 +223,9 @@ export class MyScene extends CGFscene {
             hay.bale.setPhysicsBody(body);
           }
         }
+      }
+      if (this.wagon && typeof this.wagon.setCarriedHayBales === 'function') {
+        this.wagon.setCarriedHayBales(this.carriedHayBales);
       }
     } catch (e) {
       console.warn('MyScene: failed to load hay entities', e);
@@ -413,31 +426,6 @@ export class MyScene extends CGFscene {
       }
     );
 
-      // Register hay bales with special handling: allow gravity to work without position locking
-      if (Array.isArray(this.haySet?.hay)) {
-        for (const hay of this.haySet.hay) {
-          const body = this.physics.registerBody({
-            position: vec3.fromValues(hay.x, 100 + Math.random() * 50, hay.z), // Start above terrain so gravity brings them down
-            velocity: vec3.fromValues(0, 0, 0),
-            gravityScale: 1,
-            groundHeightFn: () => {
-              if (this.terrain?.getHeightAt) {
-                const terrainY = this.terrain.getHeightAt(hay.x, hay.z);
-                return terrainY + 1.0;
-              }
-              return 0;
-            },
-            onStep: (body) => {
-              hay.y = body.position[1];
-            },
-          });
-
-          // Attach the physics body to the bale model so the model handles rendering/collision
-          if (hay.bale && typeof hay.bale.setPhysicsBody === 'function') {
-            hay.bale.setPhysicsBody(body);
-          }
-        }
-      }
     if (this.barn) {
       this.physics.registerBody({
         name: 'barn',
@@ -1005,6 +993,10 @@ export class MyScene extends CGFscene {
       return key;
     }
 
+    if (['p', 'l'].includes(key)) {
+      return key;
+    }
+
     return '';
   }
 
@@ -1065,6 +1057,14 @@ export class MyScene extends CGFscene {
     } else if (key === 'space') {
       this.playerInput.space = true;
       // Start charging jump (don't apply immediately)
+    } else if (key === 'p') {
+      if (this.actorChoice === 'Wagon' && !event.repeat) {
+        this.actionInput.pickup = true;
+      }
+    } else if (key === 'l') {
+      if (this.actorChoice === 'Wagon' && !event.repeat) {
+        this.actionInput.drop = true;
+      }
     }
   }
 
@@ -1087,6 +1087,153 @@ export class MyScene extends CGFscene {
     } else if (key === 'space') {
       this.playerInput.space = false;
       // Mark space as released; jump will be triggered in updatePlayerBallControl
+    }
+  }
+
+  findNearestAvailableHayBale(maxDistance = 8.5) {
+    if (!this.wagon || !this.haySet?.hay) {
+      return null;
+    }
+
+    let closestHay = null;
+    let closestDistance = maxDistance;
+
+    for (const hay of this.haySet.hay) {
+      if (!hay || hay.collected || !hay.bale) {
+        continue;
+      }
+
+      if (this.terrain?.isPointInBarnArea && this.terrain.isPointInBarnArea(hay.x, hay.z, 0)) {
+        continue;
+      }
+
+      const dx = hay.x - this.wagon.x;
+      const dz = hay.z - this.wagon.z;
+      const distance = Math.hypot(dx, dz);
+
+      if (distance <= closestDistance) {
+        closestDistance = distance;
+        closestHay = hay;
+      }
+    }
+
+    return closestHay;
+  }
+
+  pickUpHayBale() {
+    if (!this.wagon || !this.haySet || !this.gameState) {
+      return false;
+    }
+
+    if (Math.abs(this.wagon.speed || 0) > 1e-3) {
+      return false;
+    }
+
+    if (this.carriedHayBales.length >= this.maxCarriedHayBales) {
+      return false;
+    }
+
+    const hay = this.findNearestAvailableHayBale();
+    if (!hay) {
+      return false;
+    }
+
+    hay.collected = true;
+    if (hay.bale && typeof hay.bale.setCarried === 'function') {
+      hay.bale.setCarried(true);
+    }
+    this.carriedHayBales.push(hay);
+    this.gameState.addBales(1);
+    return true;
+  }
+
+  getBarnSideDropPosition(slotIndex = 0) {
+    if (!this.barn) {
+      return null;
+    }
+
+    const barn = this.barn;
+    const halfWidth = barn.width / 2;
+    const halfDepth = barn.depth / 2;
+    const sidePadding = 3.0;
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+    const dx = this.wagon.x - barn.positionX;
+    const dz = this.wagon.z - barn.positionZ;
+
+    let dropX = this.wagon.x;
+    let dropZ = this.wagon.z;
+
+    if (Math.abs(dx) >= Math.abs(dz)) {
+      dropX = barn.positionX + Math.sign(dx || 1) * (halfWidth + sidePadding);
+      dropZ = clamp(this.wagon.z, barn.positionZ - halfDepth + 2.0, barn.positionZ + halfDepth - 2.0);
+    } else {
+      dropZ = barn.positionZ + Math.sign(dz || 1) * (halfDepth + sidePadding);
+      dropX = clamp(this.wagon.x, barn.positionX - halfWidth + 2.0, barn.positionX + halfWidth - 2.0);
+    }
+
+    const slotOffset = slotIndex % 2 === 0 ? -1.25 : 1.25;
+    if (Math.abs(dx) >= Math.abs(dz)) {
+      dropZ += slotOffset;
+    } else {
+      dropX += slotOffset;
+    }
+
+    const terrainY = this.terrain?.getHeightAt ? this.terrain.getHeightAt(dropX, dropZ) : 0;
+    return [dropX, terrainY + 1.0, dropZ];
+  }
+
+  dropHayBale() {
+    if (!this.wagon || !this.barn || !this.haySet || !this.gameState) {
+      return false;
+    }
+
+    if (!this.terrain?.isPointInBarnArea || !this.terrain.isPointInBarnArea(this.wagon.x, this.wagon.z, 0)) {
+      return false;
+    }
+
+    if (!this.carriedHayBales.length) {
+      return false;
+    }
+
+    const hay = this.carriedHayBales.pop();
+    const dropPos = this.getBarnSideDropPosition(this.barnDropSlot++);
+    if (!dropPos) {
+      this.carriedHayBales.push(hay);
+      return false;
+    }
+
+    const [dropX, dropY, dropZ] = dropPos;
+    hay.collected = false;
+    if (hay.bale && typeof hay.bale.setCarried === 'function') {
+      hay.bale.setCarried(false);
+      if (hay.bale.body) {
+        hay.bale.body.position[0] = dropX;
+        hay.bale.body.position[1] = dropY;
+        hay.bale.body.position[2] = dropZ;
+        hay.bale.body.velocity[0] = 0;
+        hay.bale.body.velocity[1] = 0;
+        hay.bale.body.velocity[2] = 0;
+        hay.bale.body.active = true;
+        hay.bale.body.settled = true;
+      }
+    }
+    hay.x = dropX;
+    hay.y = dropY;
+    hay.z = dropZ;
+    this.gameState.removeBales(1);
+    return true;
+  }
+
+  processHayActions() {
+    if (this.actionInput.pickup) {
+      this.pickUpHayBale();
+      this.actionInput.pickup = false;
+    }
+
+    if (this.actionInput.drop) {
+      this.dropHayBale();
+      this.actionInput.drop = false;
     }
   }
 
@@ -1214,6 +1361,11 @@ export class MyScene extends CGFscene {
       this._lastActorChoice = this.actorChoice;
     }
 
+    if (this.actorChoice !== 'Wagon') {
+      this.actionInput.pickup = false;
+      this.actionInput.drop = false;
+    }
+
     if (deltaTime > 0) {
       // Only route player input to the ball when it's the active actor
       if (this.actorChoice === 'Ball') this.updatePlayerBallControl(deltaTime);
@@ -1255,6 +1407,7 @@ export class MyScene extends CGFscene {
         this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
       }
       this.wagon.updateTerrainAlignment(this.terrain, deltaTime);
+      this.processHayActions();
       
       // Make camera follow wagon when it's active
       if (this.camera && typeof this.camera.follow === 'function') {

@@ -43,7 +43,7 @@ export class MyInterface extends CGFinterface {
                 if (self.scene) self.scene.keys.Space = true;
             }
 
-            if (['w', 'a', 's', 'd'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
+            if (gameKeys.indexOf(key) !== -1 || key === ' ' || code === 'Space') {
                 if (self.scene && typeof self.scene.handleControlKeyDown === 'function') {
                     self.scene.handleControlKeyDown(ev);
                 }
@@ -67,7 +67,7 @@ export class MyInterface extends CGFinterface {
                 if (self.scene) self.scene.keys.Space = false;
             }
 
-            if (['w', 'a', 's', 'd'].indexOf(key) !== -1 || key === ' ' || code === 'Space') {
+            if (gameKeys.indexOf(key) !== -1 || key === ' ' || code === 'Space') {
                 if (self.scene && typeof self.scene.handleControlKeyUp === 'function') {
                     self.scene.handleControlKeyUp(ev);
                 }

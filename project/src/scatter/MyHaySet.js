@@ -47,6 +47,7 @@ export class MyHaySet extends CGFobject {
         y: 0,
         z,
         scale,
+        collected: false,
       });
     }
   }
@@ -69,6 +70,10 @@ export class MyHaySet extends CGFobject {
   display() {
     for (let i = 0; i < this.hay.length; i++) {
       const h = this.hay[i];
+
+      if (h.collected) {
+        continue;
+      }
 
       // If the bale manages its own physics and position, let it render itself
       if (h.bale && typeof h.bale.display === 'function') {

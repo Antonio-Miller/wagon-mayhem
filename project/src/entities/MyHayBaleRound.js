@@ -7,6 +7,7 @@ export class MyHayBaleRound extends CGFobject {
     this.model = new MyOBJModel(scene, "/project/models/circle_hay.obj", scale);
     this.scale = scale;
     this.body = null;
+    this.carried = false;
     this.minY = this.model.minY;
     this.maxY = this.model.maxY;
     console.log('[MyHayBaleRound] Model loaded:', { inited: this.model.inited, submeshCount: this.model.submeshes.length });
@@ -45,23 +46,22 @@ export class MyHayBaleRound extends CGFobject {
       return;
     }
 
+    if (this.carried) {
+      return;
+    }
+
     // If a physics body is attached, use its position for rendering
     if (this.body && this.body.position) {
       const pos = this.body.position;
 
-      // Compute terrain alignment using current body state (no deltaTime available here,
-      // so we use an internal smoothing factor that assumes small frame-to-frame steps).
+      // Compute terrain alignment using current body state.
       if (this.scene && this.scene.terrain && typeof this.scene.terrain.getTerrainNormalAt === 'function') {
         this.updateTerrainAlignment(this.scene.terrain);
       }
 
-      this.scene.pushMatrix();
-      this.scene.translate(pos[0], pos[1], pos[2]);
-      if (this.terrainAlignmentMatrix) {
-        this.scene.multMatrix(this.terrainAlignmentMatrix);
-      }
-      this.model.display();
-      this.scene.popMatrix();
+      this.displayAtPosition(pos[0], pos[1], pos[2], {
+        alignToTerrain: true,
+      });
       return;
     }
 
@@ -71,6 +71,42 @@ export class MyHayBaleRound extends CGFobject {
 
   setPhysicsBody(body) {
     this.body = body;
+  }
+
+  setCarried(isCarried) {
+    this.carried = isCarried;
+    if (this.body) {
+      this.body.active = !isCarried;
+      if (isCarried) {
+        this.body.velocity[0] = 0;
+        this.body.velocity[1] = 0;
+        this.body.velocity[2] = 0;
+      }
+    }
+  }
+
+  displayAtPosition(x, y, z, options = {}) {
+    if (!this.model || !this.model.inited) {
+      return;
+    }
+
+    const rotationY = options.rotationY ?? 0;
+    const scaleMultiplier = options.scaleMultiplier ?? 1.0;
+    const alignToTerrain = options.alignToTerrain ?? false;
+
+    this.scene.pushMatrix();
+    this.scene.translate(x, y, z);
+    if (rotationY) {
+      this.scene.rotate(rotationY, 0, 1, 0);
+    }
+    if (alignToTerrain && this.terrainAlignmentMatrix) {
+      this.scene.multMatrix(this.terrainAlignmentMatrix);
+    }
+    if (scaleMultiplier !== 1.0) {
+      this.scene.scale(scaleMultiplier, scaleMultiplier, scaleMultiplier);
+    }
+    this.model.display();
+    this.scene.popMatrix();
   }
 
   updateTerrainAlignment(terrain) {
