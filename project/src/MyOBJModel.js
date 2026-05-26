@@ -1,4 +1,4 @@
-import { CGFappearance, CGFobject } from "../../lib/CGF.js";
+import { CGFappearance, CGFobject, CGFtexture } from "../../lib/CGF.js";
 
 export class MyOBJModel extends CGFobject {
   constructor(scene, url, scale = 1.0) {
@@ -27,9 +27,28 @@ export class MyOBJModel extends CGFobject {
     throw new Error('Failed to load ' + url + ' (' + req.status + ')');
   }
 
-  _parseMTL(text) {
+  _parseMTL(text, baseUrl = '') {
     const materials = new Map();
     let current = null;
+
+    const normalizePath = (path) => {
+      // Normalize sequences like "/a/b/../c" -> "/a/c". Works with absolute or relative paths.
+      const parts = path.split(/[\\/]/).filter(Boolean);
+      const stack = [];
+      // If path starts with '/', keep leading empty marker to restore absolute
+      const absolute = path.startsWith('/');
+      for (const p of parts) {
+        if (p === '..') {
+          if (stack.length && stack[stack.length - 1] !== '..') stack.pop();
+          else if (!absolute) stack.push('..');
+        } else if (p === '.') {
+          continue;
+        } else {
+          stack.push(p);
+        }
+      }
+      return (absolute ? '/' : '') + stack.join('/');
+    };
 
     for (const raw of text.split('\n')) {
       const line = raw.trim();
@@ -52,6 +71,32 @@ export class MyOBJModel extends CGFobject {
         current.Ks = [parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])];
       } else if (current && parts[0] === 'Ns' && parts.length >= 2) {
         current.Ns = parseFloat(parts[1]);
+      } else if (current && (parts[0] === 'map_Kd' || parts[0] === 'map_kd') && parts[1]) {
+        // Resolve texture path relative to the MTL file base URL when possible
+        let texPath = parts.slice(1).join(' ');
+        // Remove optional -o/-s flags if present (basic handling)
+        if (texPath.startsWith('-')) {
+          const toks = texPath.split(/\s+/);
+          texPath = toks[toks.length - 1];
+        }
+        // Store original candidate plus helpful fallbacks (basename in common project folders)
+        const candidates = [];
+        candidates.push(texPath);
+        // If baseUrl provided, resolve texPath against it (handle ../ and ./)
+        if (baseUrl) {
+          const resolved = normalizePath(baseUrl + texPath);
+          candidates.unshift(resolved);
+        }
+        const basename = texPath.split(/[\\/]/).pop();
+        if (basename && basename.length) {
+          if (baseUrl) candidates.push(baseUrl + basename);
+          candidates.push('/project/models/' + basename);
+          candidates.push('/project/textures/' + basename);
+          candidates.push('/project/src/textures/' + basename);
+        }
+        // Also prefer absolute path if it starts with '/'
+        if (texPath.startsWith('/')) candidates.unshift(texPath);
+        current.mapKdCandidates = candidates;
       }
     }
 
@@ -69,6 +114,32 @@ export class MyOBJModel extends CGFobject {
     appearance.setDiffuse(kd[0], kd[1], kd[2], 1);
     appearance.setSpecular(ks[0], ks[1], ks[2], 1);
     appearance.setShininess(ns);
+    // Try to attach a texture from any candidate path if provided
+    let chosenTexture = null;
+    if (materialInfo && (materialInfo.mapKd || materialInfo.mapKdCandidates)) {
+      const candidates = materialInfo.mapKdCandidates || (materialInfo.mapKd ? [materialInfo.mapKd] : []);
+      for (const c of candidates) {
+        if (!c) continue;
+        try {
+          const tex = new CGFtexture(this.scene, c);
+          appearance.setTexture(tex);
+          appearance.setTextureWrap("REPEAT", "REPEAT");
+          chosenTexture = c;
+          break; // stop after first candidate is assigned
+        } catch (e) {
+          // try next candidate
+        }
+      }
+    }
+
+    // Debug: print material assignment for this model
+    try {
+      const matName = materialInfo?.name || 'default';
+      const kdStr = kd ? kd.map((v) => v.toFixed(3)).join(',') : 'none';
+      console.log(`[MyOBJModel] ${this.url} -> material='${matName}', Kd=[${kdStr}], texture='${chosenTexture || 'none'}'`);
+    } catch (e) {
+      console.log('[MyOBJModel] material assignment debug log failed', e);
+    }
     return appearance;
   }
 
@@ -110,7 +181,7 @@ export class MyOBJModel extends CGFobject {
       if (parts[0] === 'mtllib' && parts[1]) {
         try {
           const mtlText = this._getSyncText(baseUrl + parts[1]);
-          mtlMap = this._parseMTL(mtlText);
+          mtlMap = this._parseMTL(mtlText, baseUrl);
         } catch (e) {
           console.warn('MyOBJModel: failed to load material library', parts[1], e);
         }
@@ -221,12 +292,30 @@ export class MyOBJModel extends CGFobject {
       submesh.indicesBuffer.numValues = submesh.indices.length;
     }
     this.inited = true;
+
+    // Compute model bounding box (minY / maxY) for positioning
+    let minY = Infinity, maxY = -Infinity;
+    for (const submesh of this.submeshes) {
+      for (let i = 1; i < submesh.vertices.length; i += 3) {
+        const y = submesh.vertices[i];
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (minY === Infinity) minY = 0;
+    if (maxY === -Infinity) maxY = 0;
+    this.minY = minY;
+    this.maxY = maxY;
+    this.modelHeight = this.maxY - this.minY;
   }
 
   display() {
     if (!this.inited) return;
     const shader = this.scene.activeShader;
     const gl = this.scene.gl;
+
+    const previousTexturesEnabled = this.scene.texturesEnabled;
+    this.scene.enableTextures(true);
 
     this.scene.pushMatrix();
     this.scene.scale(this.scale, this.scale, this.scale);
@@ -256,5 +345,6 @@ export class MyOBJModel extends CGFobject {
     }
 
     this.scene.popMatrix();
+    this.scene.enableTextures(previousTexturesEnabled);
   }
 }

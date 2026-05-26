@@ -4,6 +4,8 @@ import { MySky } from "./environment/MySky.js";
 import { MyClouds } from "./environment/MyClouds.js";
 import { MyTerrain } from "./terrain/MyTerrain.js";
 import { MyRockSet } from "./scatter/MyRockSet.js";
+import { MyHayBaleRound } from "./entities/MyHayBaleRound.js";
+import { MyHaySet } from "./scatter/MyHaySet.js";
 import { MyPineTreeSet } from "./scatter/MyPineTreeSet.js";
 import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
@@ -182,6 +184,40 @@ export class MyScene extends CGFscene {
     this.lastCameraDebugLogTime = 0;
 
     this.setUpdatePeriod(16);
+
+    // Load OBJ hay entities and position them near the terrain center
+    try {
+      this.circleHayModel = new MyHayBaleRound(this, 8.0);
+      // create a scattered set of 8 hay bales, avoiding rocks and trees
+      this.haySet = new MyHaySet(this, 8, this.terrain, this.rocks, this.pineTrees);
+      // Register hay physics bodies now that haySet exists (avoid re-registering other bodies)
+      if (this.physics && Array.isArray(this.haySet?.hay)) {
+        for (const hay of this.haySet.hay) {
+          const body = this.physics.registerBody({
+            position: vec3.fromValues(hay.x, 100 + Math.random() * 50, hay.z),
+            velocity: vec3.fromValues(0, 0, 0),
+            gravityScale: 1,
+            groundHeightFn: () => {
+              if (this.terrain?.getHeightAt) {
+                const terrainY = this.terrain.getHeightAt(hay.x, hay.z);
+                return terrainY + 1.0;
+              }
+              return 0;
+            },
+            onStep: (body) => {
+              hay.y = body.position[1];
+            },
+          });
+
+          if (hay.bale && typeof hay.bale.setPhysicsBody === 'function') {
+            hay.bale.setPhysicsBody(body);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('MyScene: failed to load hay entities', e);
+      this.haySet = null;
+    }
 
     // Keyboard state — written by MyInterface, read by wagon.update()
     this.keys = {};
@@ -377,6 +413,31 @@ export class MyScene extends CGFscene {
       }
     );
 
+      // Register hay bales with special handling: allow gravity to work without position locking
+      if (Array.isArray(this.haySet?.hay)) {
+        for (const hay of this.haySet.hay) {
+          const body = this.physics.registerBody({
+            position: vec3.fromValues(hay.x, 100 + Math.random() * 50, hay.z), // Start above terrain so gravity brings them down
+            velocity: vec3.fromValues(0, 0, 0),
+            gravityScale: 1,
+            groundHeightFn: () => {
+              if (this.terrain?.getHeightAt) {
+                const terrainY = this.terrain.getHeightAt(hay.x, hay.z);
+                return terrainY + 1.0;
+              }
+              return 0;
+            },
+            onStep: (body) => {
+              hay.y = body.position[1];
+            },
+          });
+
+          // Attach the physics body to the bale model so the model handles rendering/collision
+          if (hay.bale && typeof hay.bale.setPhysicsBody === 'function') {
+            hay.bale.setPhysicsBody(body);
+          }
+        }
+      }
     if (this.barn) {
       this.physics.registerBody({
         name: 'barn',
@@ -1251,6 +1312,22 @@ export class MyScene extends CGFscene {
     this.sky.display();
     this.clouds.display();
     this.terrain.display();
+    if (this.haySet) this.haySet.display();
+    // Render loaded OBJ models at terrain center (adjust vertically using model bbox)
+    if (this.hayModels && this.hayModels.length) {
+      for (const entry of this.hayModels) {
+        const m = entry.model;
+        if (!m || !m.model || !m.model.inited) continue;
+        const x = entry.x;
+        const z = entry.z;
+        const terrainY = this.terrain ? this.terrain.getHeightAt(x, z) : 0;
+        const yTrans = terrainY - (m.minY * m.scale) + 0.01;
+        this.pushMatrix();
+        this.translate(x, yTrans, z);
+        m.display();
+        this.popMatrix();
+      }
+    }
     
     this.barn.display();
     this.barnFence.display();
