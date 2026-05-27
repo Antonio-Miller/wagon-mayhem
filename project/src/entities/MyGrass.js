@@ -57,6 +57,7 @@ export class MyGrass extends CGFobject {
   constructor(scene, terrain, patchSpacing = 2) {
     super(scene);
     this.terrain = terrain;
+    this.basePatchSpacing = patchSpacing;
     this.patchSpacing = patchSpacing;
     this.pathClearance = 4;
     this.time = 0;
@@ -65,6 +66,7 @@ export class MyGrass extends CGFobject {
     this.meshVariantCount = 18;
     this.placementCursor = 0;
     this.placementBudgetPerFrame = 3000;
+    this.densityScale = 1.0;
     // Rendering culling / LOD
     this.renderRadius = 90; // full-density radius around camera
     this.renderRadiusFar = 300; // beyond this radius, skip rendering
@@ -134,6 +136,30 @@ export class MyGrass extends CGFobject {
         });
       }
     }
+  }
+
+  rebuildPatches() {
+    this.patches = [];
+    this.placementCursor = 0;
+    this.buildPatches();
+  }
+
+  setGrassDensity(density) {
+    const clampedDensity = Math.max(0.25, Math.min(1.0, density));
+
+    if (Math.abs(clampedDensity - this.densityScale) < 1e-6) {
+      return;
+    }
+
+    this.densityScale = clampedDensity;
+    this.patchSpacing = this.basePatchSpacing / Math.sqrt(this.densityScale);
+    this.rebuildPatches();
+  }
+
+  setRenderDistance(renderDistance) {
+    const clampedDistance = Math.max(250, Math.min(1200, renderDistance));
+    this.renderRadiusFar = clampedDistance;
+    this.renderRadius = Math.max(40, clampedDistance * 0.3);
   }
 
   update(time) {

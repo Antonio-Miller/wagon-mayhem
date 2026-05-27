@@ -40,6 +40,8 @@ export class MyScene extends CGFscene {
       pickup: false,
       drop: false,
     };
+    this.grassAmount = 1.0;
+    this.renderDistance = 1000;
     this.carriedHayBales = [];
     this.maxCarriedHayBales = 2;
     this.barnDropSlot = 0;
@@ -168,7 +170,7 @@ export class MyScene extends CGFscene {
     this.grass = new MyGrass(this, this.terrain);
     this.rocks = new MyRockSet(this, 20, this.terrain);
     this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
-    this.flowers = new MyFlowerSet(this, 80, this.terrain, this.rocks, this.pineTrees);
+    this.flowers = new MyFlowerSet(this, 40, this.terrain, this.rocks, this.pineTrees);
     this.physics = new MyPhysicsEngine(this, {
       gravity: -24.0,
       terminalVelocity: -90.0,
@@ -190,6 +192,7 @@ export class MyScene extends CGFscene {
       this._switchActiveActor('Ball', 'Wagon');
       this._lastActorChoice = this.actorChoice;
     }
+    this.applyPerformanceSettings();
     this.lastUpdateTime = 0;
     this.cameraDebugEnabled = false;
     this.cameraDebugIntervalMs = 500;
@@ -318,6 +321,29 @@ export class MyScene extends CGFscene {
       // first-person will be handled by the scene every frame (lock to ball)
       this.camera.smoothing = 1.0;
     }
+  }
+
+  setGrassAmount(amount) {
+    const clampedAmount = Math.max(0.25, Math.min(1.0, amount));
+    this.grassAmount = clampedAmount;
+
+    if (this.grass && typeof this.grass.setGrassDensity === 'function') {
+      this.grass.setGrassDensity(clampedAmount);
+    }
+  }
+
+  setRenderDistance(renderDistance) {
+    const clampedDistance = Math.max(250, Math.min(1200, renderDistance));
+    this.renderDistance = clampedDistance;
+
+    if (this.camera) {
+      this.camera.far = clampedDistance;
+    }
+  }
+
+  applyPerformanceSettings() {
+    this.setGrassAmount(this.grassAmount);
+    this.setRenderDistance(this.renderDistance);
   }
   setDefaultAppearance() {
     // Keep scene material mostly neutral so sun color tint is visible.

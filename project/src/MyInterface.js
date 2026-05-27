@@ -21,6 +21,18 @@ export class MyInterface extends CGFinterface {
         this.gui.add(this.scene, 'displayAxis').name('Display Axis');
         this.gui.add(this.scene, 'sunEnabled').name('Sun On');
         this.gui.add(this.scene, 'timeOfDay', 0, 24).name('Time of Day').step(0.5);
+        this.gui.add(this.scene, 'grassAmount', 0.25, 1.0).name('Grass Amount').step(0.05)
+            .onFinishChange((value) => {
+                if (this.scene && typeof this.scene.setGrassAmount === 'function') {
+                    this.scene.setGrassAmount(value);
+                }
+            });
+        this.gui.add(this.scene, 'renderDistance', 250, 1200).name('Render Distance').step(25)
+            .onFinishChange((value) => {
+                if (this.scene && typeof this.scene.setRenderDistance === 'function') {
+                    this.scene.setRenderDistance(value);
+                }
+            });
         // Choose active actor: Ball or Wagon
         // default is set in the scene (this.scene.actorChoice)
         this.gui.add(this.scene, 'actorChoice', ['Ball', 'Wagon']).name('Active Actor');
