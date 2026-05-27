@@ -43,6 +43,8 @@ export class MyScene extends CGFscene {
     this.carriedHayBales = [];
     this.maxCarriedHayBales = 2;
     this.barnDropSlot = 0;
+    // Explicit stored hay bale registry (bales delivered to barn via L)
+    this.storedHayBales = [];
     // Active actor choice: 'Ball' or 'Wagon' (default: Wagon)
     this.actorChoice = 'Wagon';
     this._lastActorChoice = this.actorChoice;
@@ -1108,7 +1110,8 @@ export class MyScene extends CGFscene {
         continue;
       }
 
-      if (this.terrain?.isPointInBarnArea && this.terrain.isPointInBarnArea(hay.x, hay.z, 0)) {
+      // Exclude hay that has been explicitly stored (only set by dropHayBale())
+      if (this.storedHayBales.includes(hay)) {
         continue;
       }
 
@@ -1144,6 +1147,12 @@ export class MyScene extends CGFscene {
     }
 
     hay.collected = true;
+    // If we pick up a bale that was previously marked as stored, clear that flag
+    if (hay.stored) {
+      const idx = this.storedHayBales.indexOf(hay);
+      if (idx !== -1) this.storedHayBales.splice(idx, 1);
+    }
+    hay.stored = false;
     if (hay.bale && typeof hay.bale.setCarried === 'function') {
       hay.bale.setCarried(true);
     }
@@ -1193,8 +1202,22 @@ export class MyScene extends CGFscene {
       return false;
     }
 
-    if (!this.terrain?.isPointInBarnArea || !this.terrain.isPointInBarnArea(this.wagon.x, this.wagon.z, 0)) {
-      return false;
+    // Drop only allowed inside the Drop Area: defined as the barn fence radius minus 5 units
+    const fenceRadius = this.barnFence?.fenceRadius ?? null;
+    if (fenceRadius === null) {
+      // fallback to terrain's barn area test if fence info not available
+      if (!this.terrain?.isPointInBarnArea || !this.terrain.isPointInBarnArea(this.wagon.x, this.wagon.z, 0)) {
+        return false;
+      }
+    } else {
+      const dropRadius = Math.max(0, fenceRadius - 5);
+      const centerX = this.barn.positionX ?? this.barnAreaCenterX;
+      const centerZ = this.barn.positionZ ?? this.barnAreaCenterZ;
+      const dx = this.wagon.x - centerX;
+      const dz = this.wagon.z - centerZ;
+      if (dx * dx + dz * dz > dropRadius * dropRadius) {
+        return false;
+      }
     }
 
     if (!this.carriedHayBales.length) {
@@ -1210,6 +1233,9 @@ export class MyScene extends CGFscene {
 
     const [dropX, dropY, dropZ] = dropPos;
     hay.collected = false;
+    // Mark this hay bale as stored in the barn (only set when dropped via L)
+    hay.stored = true;
+    if (!this.storedHayBales.includes(hay)) this.storedHayBales.push(hay);
     if (hay.bale && typeof hay.bale.setCarried === 'function') {
       hay.bale.setCarried(false);
       if (hay.bale.body) {
@@ -1276,6 +1302,9 @@ export class MyScene extends CGFscene {
         continue;
       }
 
+      // Only treat the bale as immovable in the barn if it was explicitly stored via L
+      const inBarnArea = !!hay.stored;
+
       let pushX = dx;
       let pushZ = dz;
       if (distance < 1e-4) {
@@ -1289,6 +1318,14 @@ export class MyScene extends CGFscene {
       const separation = collisionThreshold - distance + 0.15;
       const impulse = Math.max(3.0, wagonSpeed * 2.2 + separation * 4.5);
 
+      if (inBarnArea) {
+        const resolveDistance = collisionThreshold + 0.2;
+        this.wagon.x = hx - pushX * resolveDistance;
+        this.wagon.z = hz - pushZ * resolveDistance;
+        this.wagon.speed = 0;
+        continue;
+      }
+
       body.position[0] = this.wagon.x + pushX * (collisionThreshold + 0.15);
       body.position[1] = Math.max(body.position[1], terrainY + 1.0);
       body.position[2] = this.wagon.z + pushZ * (collisionThreshold + 0.15);
@@ -1298,6 +1335,131 @@ export class MyScene extends CGFscene {
       body.active = true;
       body.settled = false;
       hay.pushCooldown = 0.2;
+    }
+  }
+
+  updateHayStaticCollisions(deltaTime) {
+    if (!this.haySet?.hay) {
+      return;
+    }
+
+    for (const hay of this.haySet.hay) {
+      if (!hay || hay.collected || !hay.bale?.body || hay.bale.carried) {
+        continue;
+      }
+
+      hay.collisionCooldown = Math.max(0, (hay.collisionCooldown || 0) - deltaTime);
+
+      const body = hay.bale.body;
+      const hx = body.position[0];
+      const hz = body.position[2];
+      const hayRadius = Math.max(2.5, hay.scale * 0.45);
+
+      // Check collision with ROCKS
+      if (this.rocks?.rocks) {
+        for (let i = 0; i < this.rocks.rocks.length; i++) {
+          const rock = this.rocks.rocks[i];
+          if (!rock || rock.x === undefined || rock.z === undefined) continue;
+
+          const dx = hx - rock.x;
+          const dz = hz - rock.z;
+          const distance = Math.hypot(dx, dz);
+          const rockRadius = (rock.scaleX + rock.scaleY + rock.scaleZ) / 3 * 0.85;
+          const collisionThreshold = hayRadius + rockRadius;
+
+          if (distance < collisionThreshold && distance > 0) {
+            const pushX = dx / distance;
+            const pushZ = dz / distance;
+            const separation = collisionThreshold - distance + 0.1;
+            body.position[0] = rock.x + pushX * (collisionThreshold + 0.1);
+            body.position[2] = rock.z + pushZ * (collisionThreshold + 0.1);
+            body.velocity[0] = pushX * 2.5;
+            body.velocity[2] = pushZ * 2.5;
+            body.settled = false;
+            hay.collisionCooldown = 0.1;
+          }
+        }
+      }
+
+      // Check collision with PINE TREES
+      if (this.pineTrees?.trees) {
+        for (let i = 0; i < this.pineTrees.trees.length; i++) {
+          const tree = this.pineTrees.trees[i];
+          if (!tree || !tree.placed || tree.x === undefined || tree.z === undefined) continue;
+
+          const dx = hx - tree.x;
+          const dz = hz - tree.z;
+          const distance = Math.hypot(dx, dz);
+          const treeRadius = tree.foliageRadius || 6;
+          const collisionThreshold = hayRadius + treeRadius;
+
+          if (distance < collisionThreshold && distance > 0) {
+            const pushX = dx / distance;
+            const pushZ = dz / distance;
+            body.position[0] = tree.x + pushX * (collisionThreshold + 0.1);
+            body.position[2] = tree.z + pushZ * (collisionThreshold + 0.1);
+            body.velocity[0] = pushX * 2.0;
+            body.velocity[2] = pushZ * 2.0;
+            body.settled = false;
+            hay.collisionCooldown = 0.1;
+          }
+        }
+      }
+
+      // Check collision with FENCE POSTS
+      if (this.barnFence?.fencePosts) {
+        for (let i = 0; i < this.barnFence.fencePosts.length; i++) {
+          const post = this.barnFence.fencePosts[i];
+          if (!post || post.x === undefined || post.z === undefined) continue;
+
+          const dx = hx - post.x;
+          const dz = hz - post.z;
+          const distance = Math.hypot(dx, dz);
+          const postRadius = (this.barnFence.postRadius || 0.35) + 0.4;
+          const collisionThreshold = hayRadius + postRadius;
+
+          if (distance < collisionThreshold && distance > 0) {
+            const pushX = dx / distance;
+            const pushZ = dz / distance;
+            body.position[0] = post.x + pushX * (collisionThreshold + 0.1);
+            body.position[2] = post.z + pushZ * (collisionThreshold + 0.1);
+            body.velocity[0] = pushX * 2.0;
+            body.velocity[2] = pushZ * 2.0;
+            body.settled = false;
+            hay.collisionCooldown = 0.1;
+          }
+        }
+      }
+
+      // Check collision with BARN
+      if (this.barn) {
+        const barnX = this.barn.positionX;
+        const barnZ = this.barn.positionZ;
+        const barnHalfWidth = (this.barn.width || 50) / 2;
+        const barnHalfDepth = (this.barn.depth || 52) / 2;
+
+        const dx = hx - barnX;
+        const dz = hz - barnZ;
+
+        const closestX = Math.max(-barnHalfWidth, Math.min(barnHalfWidth, dx));
+        const closestZ = Math.max(-barnHalfDepth, Math.min(barnHalfDepth, dz));
+
+        const distX = dx - closestX;
+        const distZ = dz - closestZ;
+        const distance = Math.hypot(distX, distZ);
+        const collisionThreshold = hayRadius + 0.5;
+
+        if (distance < collisionThreshold && distance > 0) {
+          const pushX = distX / distance;
+          const pushZ = distZ / distance;
+          body.position[0] = barnX + closestX + pushX * (collisionThreshold + 0.1);
+          body.position[2] = barnZ + closestZ + pushZ * (collisionThreshold + 0.1);
+          body.velocity[0] = pushX * 2.0;
+          body.velocity[2] = pushZ * 2.0;
+          body.settled = false;
+          hay.collisionCooldown = 0.1;
+        }
+      }
     }
   }
 
@@ -1466,6 +1628,8 @@ export class MyScene extends CGFscene {
       });
 
       this.updateHayWagonCollisions(deltaTime);
+
+      this.updateHayStaticCollisions(deltaTime);
 
       // constrain wagon against world geometry
       this.constrainWagonPosition(this.wagon);
