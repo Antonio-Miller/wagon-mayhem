@@ -126,8 +126,8 @@ export class MyWagon {
 
     const cargoY = this.floorY + this.floorThick + 0.75;
     const slots = [
-      { x: -1.35, z: -0.75, rotationY: 0.18 },
-      { x: 1.35, z: 0.75, rotationY: -0.22 },
+      { x: -1.35, z: -0.75, rotationX: Math.PI / 2 },
+      { x: 1.35, z: 0.75, rotationX: Math.PI / 2 },
     ];
 
     for (let i = 0; i < this.carriedHayBales.length && i < slots.length; i++) {
@@ -137,7 +137,7 @@ export class MyWagon {
       const slot = slots[i];
       // Keep hay at its original size (scaleMultiplier: 1.0)
       hay.bale.displayAtPosition(slot.x, cargoY, slot.z, {
-        rotationY: slot.rotationY,
+        rotationX: slot.rotationX,
         scaleMultiplier: 1.0,
       });
     }

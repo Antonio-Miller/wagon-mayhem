@@ -38,8 +38,8 @@ export class MyHaySet extends CGFobject {
 
       positions.push({ x, z });
 
-      // Slight variation in scale (use larger scale to match model units)
-      const scale = 6.0 + Math.random() * 4.0; // 6.0 .. 10.0
+      // Fixed scale for consistent hay bales
+      const scale = 8.0;
 
       this.hay.push({
         bale: new MyHayBaleRound(this.scene, scale),

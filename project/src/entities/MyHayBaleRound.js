@@ -1,16 +1,20 @@
 import { CGFobject, CGFappearance, CGFtexture } from "../../../lib/CGF.js";
-import { MyOBJModel } from "../MyOBJModel.js";
+import { MyCilinder } from "../primitives/MyCilinder.js";
 
 export class MyHayBaleRound extends CGFobject {
   constructor(scene, scale = 8.0) {
     super(scene);
-    this.model = new MyOBJModel(scene, "/project/models/circle_hay.obj", scale);
+    // Keep the cylinder slender and longer so, once rotated, it reads as a bale.
+    const radius = 1.2 * scale / 8.0;
+    const height = 3.3 * scale / 8.0;
+    this.model = new MyCilinder(scene, 32, 16, radius, height, true);
     this.scale = scale;
+    this.modelRotationX = Math.PI / 2;
     this.body = null;
     this.carried = false;
-    this.minY = this.model.minY;
-    this.maxY = this.model.maxY;
-    console.log('[MyHayBaleRound] Model loaded:', { inited: this.model.inited, submeshCount: this.model.submeshes.length });
+    this.minY = 0;
+    this.maxY = height;
+    console.log('[MyHayBaleRound] Cylinder created:', { radius, height, scale });
 
     // Terrain alignment state (for tilting on slopes)
     this.terrainAlignmentMatrix = null;
@@ -32,17 +36,12 @@ export class MyHayBaleRound extends CGFobject {
       console.warn('MyHayBaleRound: failed to load texture', e);
     }
 
-    if (this.model && Array.isArray(this.model.submeshes)) {
-      console.log('[MyHayBaleRound] Overriding', this.model.submeshes.length, 'submeshes with straw appearance');
-      for (const sm of this.model.submeshes) sm.appearance = app;
-    } else {
-      console.warn('[MyHayBaleRound] Could not override submeshes - model or submeshes array invalid');
-    }
+    this.appearance = app;
   }
 
   display() {
-    if (!this.model) {
-      console.warn('[MyHayBaleRound.display] Model is null or undefined');
+    if (!this.model || !this.model.vertices) {
+      console.warn('[MyHayBaleRound.display] Model is null or invalid');
       return;
     }
 
@@ -66,6 +65,7 @@ export class MyHayBaleRound extends CGFobject {
     }
 
     // Fallback: render model at origin (caller responsible for positioning)
+    this.appearance.apply();
     this.model.display();
   }
 
@@ -86,16 +86,20 @@ export class MyHayBaleRound extends CGFobject {
   }
 
   displayAtPosition(x, y, z, options = {}) {
-    if (!this.model || !this.model.inited) {
+    if (!this.model || !this.model.vertices) {
       return;
     }
 
+    const rotationX = options.rotationX ?? this.modelRotationX ?? 0;
     const rotationY = options.rotationY ?? 0;
     const scaleMultiplier = options.scaleMultiplier ?? 1.0;
     const alignToTerrain = options.alignToTerrain ?? false;
 
     this.scene.pushMatrix();
     this.scene.translate(x, y, z);
+    if (rotationX) {
+      this.scene.rotate(rotationX, 1, 0, 0);
+    }
     if (rotationY) {
       this.scene.rotate(rotationY, 0, 1, 0);
     }
@@ -105,6 +109,7 @@ export class MyHayBaleRound extends CGFobject {
     if (scaleMultiplier !== 1.0) {
       this.scene.scale(scaleMultiplier, scaleMultiplier, scaleMultiplier);
     }
+    this.appearance.apply();
     this.model.display();
     this.scene.popMatrix();
   }

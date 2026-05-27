@@ -41,8 +41,8 @@ export class MyCilinder extends CGFobject {
         const first = i * stride + j;
         const second = first + stride;
 
-        this.indices.push(first, second, first + 1);
-        this.indices.push(second, second + 1, first + 1);
+        this.indices.push(first, first + 1, second);
+        this.indices.push(second, first + 1, second + 1);
       }
     }
 
@@ -65,7 +65,6 @@ export class MyCilinder extends CGFobject {
       for (let j = 0; j < this.slices; j++) {
         const first = bottomCenterIndex + j + 1;
         const second = bottomCenterIndex + j + 2;
-        this.indices.push(bottomCenterIndex, first, second);
         this.indices.push(bottomCenterIndex, second, first);
       }
 
@@ -88,7 +87,6 @@ export class MyCilinder extends CGFobject {
         const first = topCenterIndex + j + 1;
         const second = topCenterIndex + j + 2;
         this.indices.push(topCenterIndex, first, second);
-        this.indices.push(topCenterIndex, second, first);
       }
     }
 
