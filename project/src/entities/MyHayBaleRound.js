@@ -65,8 +65,11 @@ export class MyHayBaleRound extends CGFobject {
     }
 
     // Fallback: render model at origin (caller responsible for positioning)
+    const prevTexturesEnabled = this.scene.texturesEnabled;
+    this.scene.enableTextures(true);
     this.appearance.apply();
     this.model.display();
+    this.scene.enableTextures(prevTexturesEnabled);
   }
 
   setPhysicsBody(body) {
@@ -109,8 +112,11 @@ export class MyHayBaleRound extends CGFobject {
     if (scaleMultiplier !== 1.0) {
       this.scene.scale(scaleMultiplier, scaleMultiplier, scaleMultiplier);
     }
+    const prevTexturesEnabled2 = this.scene.texturesEnabled;
+    this.scene.enableTextures(true);
     this.appearance.apply();
     this.model.display();
+    this.scene.enableTextures(prevTexturesEnabled2);
     this.scene.popMatrix();
   }
 
