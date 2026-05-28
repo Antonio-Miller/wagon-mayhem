@@ -202,6 +202,10 @@ export class MyFlowerSet extends CGFobject {
   }
 
   display() {
+    // Get camera position for distance culling
+    const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
+    const flowerRenderDist = 280;  // Render flowers within 280 units of camera
+
     for (let i = 0; i < this.flowers.length; i++) {
       const flowerEntry = this.flowers[i];
 
@@ -212,6 +216,14 @@ export class MyFlowerSet extends CGFobject {
         } else {
           continue;
         }
+      }
+
+      // Distance culling: skip flowers that are too far
+      const dx = cam[0] - flowerEntry.x;
+      const dz = cam[2] - flowerEntry.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > flowerRenderDist * flowerRenderDist) {
+        continue;
       }
 
       this.scene.pushMatrix();

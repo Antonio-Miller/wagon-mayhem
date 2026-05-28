@@ -7,7 +7,7 @@ import { MyRockSet } from "./scatter/MyRockSet.js";
 import { MyHayBaleRound } from "./entities/MyHayBaleRound.js";
 import { MyHaySet } from "./scatter/MyHaySet.js";
 import { MyPineTreeSet } from "./scatter/MyPineTreeSet.js";
-import { poissonDiskSamples } from "./scatter/distribute.js";
+import { distributeMixedRocksAndTrees } from "./scatter/distribute.js";
 import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
 import { MyBarn } from "./entities/MyBarn.js";
@@ -41,8 +41,8 @@ export class MyScene extends CGFscene {
       pickup: false,
       drop: false,
     };
-    this.grassAmount = 1.0;
-    this.renderDistance = 1000;
+    this.grassAmount = 0.4;    // 40% density: balances visuals with performance
+    this.renderDistance = 650;  // ~65% of max: reduces far-LOD overhead
     this.carriedHayBales = [];
     this.maxCarriedHayBales = 2;
     this.barnDropSlot = 0;
@@ -170,55 +170,29 @@ export class MyScene extends CGFscene {
 
     this.grass = new MyGrass(this, this.terrain);
 
-    // Mixed dispersion for trees and rocks using shared Poisson-disc samples
-    const rockCount = 20;
-    const treeCount = 20;
-    const samples = poissonDiskSamples(290, 12, 30);
-    const rockPositions = [];
-    const treePositions = [];
-    const minTree = 32;
-    const minRock = 12;
+    // Mixed dispersion for trees and rocks is fully centralized in distribute.js
+    const rockCount = 10;
+    const treeCount = 15;
+    const { treePositions, rockPositions } = distributeMixedRocksAndTrees({
+      radius: 290,
+      treeCount,
+      rockCount,
+      treeMinDist: 32,
+      rockMinDist: 12,
+      crossMinDist: 20,
+      baseMinDist: 10,
+      k: 30,
+      forbiddenFn: (x, z, kind) => {
+        if (!this.terrain?.isPointForbidden) return false;
+        const clearance = kind === "tree" ? 20 : 15;
+        return this.terrain.isPointForbidden(x, z, clearance);
+      },
+    });
 
-    // Assign samples to trees and rocks with spacing checks
-    for (let i = 0; i < samples.length && (rockPositions.length < rockCount || treePositions.length < treeCount); i++) {
-      const [sx, sz] = samples[i];
-      // try to place a tree first if we still need trees
-      if (treePositions.length < treeCount) {
-        let ok = true;
-        for (const t of treePositions) {
-          const dx = t.x - sx; const dz = t.z - sz;
-          if (dx*dx + dz*dz < minTree*minTree) { ok = false; break; }
-        }
-        if (ok) {
-          for (const r of rockPositions) {
-            const dx = r.x - sx; const dz = r.z - sz;
-            if (dx*dx + dz*dz < minTree*minTree) { ok = false; break; }
-          }
-        }
-        if (ok) { treePositions.push({x: sx, z: sz}); continue; }
-      }
-
-      // try to place a rock
-      if (rockPositions.length < rockCount) {
-        let ok = true;
-        for (const r of rockPositions) {
-          const dx = r.x - sx; const dz = r.z - sz;
-          if (dx*dx + dz*dz < minRock*minRock) { ok = false; break; }
-        }
-        if (ok) {
-          for (const t of treePositions) {
-            const dx = t.x - sx; const dz = t.z - sz;
-            if (dx*dx + dz*dz < minRock*minRock) { ok = false; break; }
-          }
-        }
-        if (ok) { rockPositions.push({x: sx, z: sz}); continue; }
-      }
-    }
-
-    // pass predefined positions to sets (they will fallback if incomplete)
+    // Pass precomputed positions to sets; placement generation is centralized in distribute.js
     this.pineTrees = new MyPineTreeSet(this, treeCount, this.terrain, treePositions);
     this.rocks = new MyRockSet(this, rockCount, this.terrain, rockPositions);
-    this.flowers = new MyFlowerSet(this, 40, this.terrain, this.rocks, this.pineTrees);
+    this.flowers = new MyFlowerSet(this, 12, this.terrain, this.rocks, this.pineTrees);  // Reduced from 20 to 12 for performance
     this.physics = new MyPhysicsEngine(this, {
       gravity: -24.0,
       terminalVelocity: -90.0,
@@ -549,6 +523,14 @@ export class MyScene extends CGFscene {
     const startY = 54.88;
     const startZ = -175.48;
 
+    // Default scene spawn used by reset flow
+    this.defaultSpawn = {
+      x: startX,
+      y: startY,
+      z: startZ,
+      heading: 0,
+    };
+
     this.ballBody = this.physics.registerBody({
       name: 'playerBall',
       position: vec3.fromValues(startX, startY, startZ),
@@ -590,6 +572,42 @@ export class MyScene extends CGFscene {
     this.setCameraMode(this.cameraModes[this.cameraModeIndex]);
 
     this.camera.follow(this.ballBody.position, this.ballHeading, { smoothing: 1.0 });
+  }
+
+  resetGameFromGameOver() {
+    if (!this.gameState || !this.gameState.isGameOver()) {
+      return;
+    }
+
+    const spawnX = this.defaultSpawn?.x ?? 0;
+    const spawnZ = this.defaultSpawn?.z ?? 0;
+    const spawnHeading = this.defaultSpawn?.heading ?? 0;
+    const spawnY = this.terrain ? this.terrain.getHeightAt(spawnX, spawnZ) : (this.defaultSpawn?.y ?? 0);
+
+    this.gameState.reset();
+    this.actionInput.pickup = false;
+    this.actionInput.drop = false;
+
+    // Reset carried hay references
+    this.carriedHayBales = [];
+    if (this.wagon && typeof this.wagon.setCarriedHayBales === 'function') {
+      this.wagon.setCarriedHayBales(this.carriedHayBales);
+    }
+
+    if (this.wagon && typeof this.wagon.reset === 'function') {
+      this.wagon.reset({
+        x: spawnX,
+        y: spawnY,
+        z: spawnZ,
+        heading: spawnHeading,
+        resetGameState: false,
+      });
+    }
+
+    // Keep the wagon as active actor after reset
+    this.actorChoice = 'Wagon';
+    this._switchActiveActor(this._lastActorChoice, this.actorChoice);
+    this._lastActorChoice = this.actorChoice;
   }
 
   constrainBallPosition(body) {
@@ -1662,6 +1680,12 @@ export class MyScene extends CGFscene {
     if (this.actorChoice !== this._lastActorChoice) {
       this._switchActiveActor(this._lastActorChoice, this.actorChoice);
       this._lastActorChoice = this.actorChoice;
+    }
+
+    // Reset is only allowed on Game Over screen
+    if (this.gameState?.isGameOver() && this.keys?.KeyR) {
+      this.resetGameFromGameOver();
+      this.keys.KeyR = false;
     }
 
     // Advance time of day: 5 hours every 5 real seconds -> 1 hour/sec (10x faster)

@@ -1,6 +1,5 @@
 import { CGFobject, CGFappearance } from "../../../lib/CGF.js";
 import { MyRock } from "../entities/MyRock.js";
-import { poissonDiskSamples } from "./distribute.js";
 
 export class MyRockSet extends CGFobject {
   constructor(scene, amount, terrain, predefinedPositions = null) {
@@ -49,52 +48,6 @@ export class MyRockSet extends CGFobject {
       }
     }
 
-    // If we still need more, fall back to random sampling with spacing checks
-    const maxAttempts = 200;
-    const minSpacing = 12;
-    while (placedCount < amount) {
-      let attempts = 0;
-      let x, z;
-      do {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = Math.random() * 290;
-        x = Math.cos(angle) * radius;
-        z = Math.sin(angle) * radius;
-        attempts++;
-        if (attempts > maxAttempts) break;
-      } while (
-        this.rocks.some(p => {
-          const dx = p.x - x;
-          const dz = p.z - z;
-          return dx*dx + dz*dz < minSpacing*minSpacing;
-        }) ||
-        (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(x, z, this.pathClearance))
-      );
-
-      if (attempts > maxAttempts) break;
-
-      let scaleX = 1.8 + Math.random() * 3.2;
-      let scaleY = 1.8 + Math.random() * 3.2;
-      let scaleZ = 1.8 + Math.random() * 3.2;
-      let rotX = Math.random() * Math.PI;
-      let rotY = Math.random() * Math.PI;
-      let rotZ = Math.random() * Math.PI;
-
-      this.rocks.push({
-        rock: new MyRock(this.scene),
-        x: x,
-        y: 0,
-        z: z,
-        scaleX: scaleX,
-        scaleY: scaleY,
-        scaleZ: scaleZ,
-        rotX: rotX,
-        rotY: rotY,
-        rotZ: rotZ,
-        placed: false
-      });
-      placedCount++;
-    }
   }
 
   constrainCamera(cameraPosition) {
@@ -124,6 +77,9 @@ export class MyRockSet extends CGFobject {
   display() {
     this.rockMaterial.apply();
 
+    const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
+    const rockRenderDist = 250;  // Render rocks within 350 units of camera
+
     // Since the heightmap image runs asynchronously, we check its height 
     // dynamically right before displaying. Once we get a valid heightmap,
     // we officially "place" the rocks onto the terrain so they don't recalculate.
@@ -141,6 +97,14 @@ export class MyRockSet extends CGFobject {
           // Image map not ready yet! Skip drawing to hide it from flashing under the ground.
           continue; 
         }
+      }
+
+      // Distance culling: skip rocks that are too far
+      const dx = cam[0] - r.x;
+      const dz = cam[2] - r.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > rockRenderDist * rockRenderDist) {
+        continue;
       }
 
       this.scene.pushMatrix();

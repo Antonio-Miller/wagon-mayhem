@@ -1,6 +1,5 @@
 import { CGFobject } from "../../../lib/CGF.js";
 import { MyPineTree } from "../entities/MyPineTree.js";
-import { poissonDiskSamples } from "./distribute.js";
 
 export class MyPineTreeSet extends CGFobject {
   constructor(scene, amount, terrain, predefinedPositions = null) {
@@ -35,45 +34,6 @@ export class MyPineTreeSet extends CGFobject {
       }
     }
 
-    // fallback: fill remaining with random sampling respecting tree spacing
-    const minSpacing = 32;
-    const maxAttempts = 200;
-    while (placedCount < amount) {
-      let attempts = 0;
-      let x, z;
-      do {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = Math.random() * 290;
-        x = Math.cos(angle) * radius;
-        z = Math.sin(angle) * radius;
-        attempts++;
-        if (attempts > maxAttempts) break;
-      } while (
-        this.trees.some(p => {
-          const dx = p.x - x;
-          const dz = p.z - z;
-          return dx*dx + dz*dz < minSpacing*minSpacing;
-        }) ||
-        (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(x, z, this.pathClearance))
-      );
-
-      if (attempts > maxAttempts) break;
-
-      const trunkHeight = 4 + Math.floor(Math.random() * 8);
-      const trunkRadius = 1 + Math.floor(Math.random() * 3);
-      const foliageRadiusMin = Math.max(4, trunkHeight + 1);
-      const foliageRadius = foliageRadiusMin + Math.floor(Math.random() * (12 - foliageRadiusMin + 1));
-      const foliageHeight = foliageRadius + 1 + Math.floor(Math.random() * 2);
-
-      this.trees.push({
-        tree: new MyPineTree(this.scene, trunkHeight, trunkRadius, foliageRadius, foliageHeight),
-        x: x,
-        y: 0,
-        z: z,
-        placed: false,
-      });
-      placedCount++;
-    }
   }
 
   constrainCamera(cameraPosition) {
@@ -107,6 +67,9 @@ export class MyPineTreeSet extends CGFobject {
   }
 
   display() {
+    const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
+    const treeRenderDist = 380;  // Render trees within 380 units of camera
+
     for (let i = 0; i < this.trees.length; i++) {
       const t = this.trees[i];
 
@@ -118,6 +81,14 @@ export class MyPineTreeSet extends CGFobject {
         } else {
           continue;
         }
+      }
+
+      // Distance culling: skip trees that are too far
+      const dx = cam[0] - t.x;
+      const dz = cam[2] - t.z;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > treeRenderDist * treeRenderDist) {
+        continue;
       }
 
       this.scene.pushMatrix();

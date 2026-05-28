@@ -148,9 +148,6 @@ export class MyWagon {
   // ────────────────────────────────────────────────────────
   update(deltaTime, keys) {
     if (this.gameState?.isGameOver()) {
-      if (keys?.KeyR) {
-        this.reset();
-      }
       return;
     }
 
@@ -239,20 +236,24 @@ export class MyWagon {
       const spinScale = (this.wheelSpinBaseScale || 1.0) + (this.wheelSpinPerGear || 0.25) * gearExtra;
       this.wheelAngle += (this.speed / Math.max(1e-6, this.wheelRadius)) * deltaTime * spinScale;
 
-    // ── Instant reset (R key) ──
-    if (keys["KeyR"]) {
-      this.reset();
-    }
   }
 
   /**
    * Reset wagon to starting state (also resets GameState if available).
    */
-  reset() {
-    this.x = 0;
-    this.z = 0;
-    this.y = 0;
-    this.heading = 0;
+  reset(options = {}) {
+    const {
+      x = 0,
+      y = 0,
+      z = 0,
+      heading = 0,
+      resetGameState = true,
+    } = options;
+
+    this.x = x;
+    this.z = z;
+    this.y = y;
+    this.heading = heading;
     this.speed = 0;
     this.steerAngle = 0;
     this.wheelAngle = 0;
@@ -261,8 +262,16 @@ export class MyWagon {
     this.smoothedTerrainForward = null;
     this.activeCollisionContacts.clear();
 
+    // Reset horse hitch state to match wagon spawn
+    this.horseHeading = this.heading;
+    const horseFwdX = Math.sin(this.horseHeading);
+    const horseFwdZ = Math.cos(this.horseHeading);
+    this.horseX = this.x + horseFwdX * this.horseLeadDist;
+    this.horseZ = this.z + horseFwdZ * this.horseLeadDist;
+    this.horseY = this.scene && this.scene.terrain ? this.scene.terrain.getHeightAt(this.horseX, this.horseZ) : this.y;
+
     // Reset GameState as well
-    if (this.gameState) {
+    if (resetGameState && this.gameState) {
       this.gameState.reset();
     }
   }

@@ -69,3 +69,110 @@ export function poissonDiskSamples(radius, minDist, k = 30) {
 
   return samples;
 }
+
+function hasNearbyPosition(positions, x, z, minDist) {
+  const minDistSq = minDist * minDist;
+  for (let i = 0; i < positions.length; i++) {
+    const p = positions[i];
+    const dx = p.x - x;
+    const dz = p.z - z;
+    if (dx * dx + dz * dz < minDistSq) return true;
+  }
+  return false;
+}
+
+function shuffleInPlace(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = array[i];
+    array[i] = array[j];
+    array[j] = tmp;
+  }
+}
+
+function buildPlacementOrder(treeCount, rockCount) {
+  const order = [];
+  let remainingTrees = treeCount;
+  let remainingRocks = rockCount;
+
+  while (remainingTrees > 0 || remainingRocks > 0) {
+    const chooseTree = remainingTrees > 0 && (
+      remainingRocks === 0 || remainingTrees >= remainingRocks
+    );
+    if (chooseTree) {
+      order.push("tree");
+      remainingTrees--;
+    } else {
+      order.push("rock");
+      remainingRocks--;
+    }
+  }
+
+  return order;
+}
+
+export function distributeMixedRocksAndTrees({
+  radius,
+  treeCount,
+  rockCount,
+  treeMinDist = 32,
+  rockMinDist = 12,
+  crossMinDist = 18,
+  baseMinDist = 10,
+  k = 30,
+  forbiddenFn = null,
+}) {
+  const trees = [];
+  const rocks = [];
+  const order = buildPlacementOrder(treeCount, rockCount);
+  const relaxation = [1.0, 0.92, 0.85, 0.78];
+
+  for (let pass = 0; pass < relaxation.length; pass++) {
+    if (trees.length >= treeCount && rocks.length >= rockCount) break;
+
+    const factor = relaxation[pass];
+    const passTreeMinDist = treeMinDist * factor;
+    const passRockMinDist = rockMinDist * factor;
+    const passCrossMinDist = crossMinDist * factor;
+    const passBaseMinDist = Math.max(2, baseMinDist * factor);
+
+    const candidatesRaw = poissonDiskSamples(radius, passBaseMinDist, k);
+    const candidates = candidatesRaw.map(([x, z]) => ({ x, z }));
+    shuffleInPlace(candidates);
+
+    const used = new Set();
+    for (let oi = 0; oi < order.length; oi++) {
+      const kind = order[oi];
+
+      if (kind === "tree" && trees.length >= treeCount) continue;
+      if (kind === "rock" && rocks.length >= rockCount) continue;
+
+      for (let ci = 0; ci < candidates.length; ci++) {
+        if (used.has(ci)) continue;
+        const c = candidates[ci];
+        if (typeof forbiddenFn === "function" && forbiddenFn(c.x, c.z, kind)) continue;
+
+        if (kind === "tree") {
+          if (hasNearbyPosition(trees, c.x, c.z, passTreeMinDist)) continue;
+          if (hasNearbyPosition(rocks, c.x, c.z, passCrossMinDist)) continue;
+          trees.push({ x: c.x, z: c.z });
+          used.add(ci);
+          break;
+        }
+
+        if (hasNearbyPosition(rocks, c.x, c.z, passRockMinDist)) continue;
+        if (hasNearbyPosition(trees, c.x, c.z, passCrossMinDist)) continue;
+        rocks.push({ x: c.x, z: c.z });
+        used.add(ci);
+        break;
+      }
+
+      if (trees.length >= treeCount && rocks.length >= rockCount) break;
+    }
+  }
+
+  return {
+    treePositions: trees.slice(0, treeCount),
+    rockPositions: rocks.slice(0, rockCount),
+  };
+}

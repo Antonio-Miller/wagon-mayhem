@@ -54,7 +54,7 @@ class GrassPatch extends CGFobject {
 }
 
 export class MyGrass extends CGFobject {
-  constructor(scene, terrain, patchSpacing = 2) {
+  constructor(scene, terrain, patchSpacing = 3.5) {
     super(scene);
     this.terrain = terrain;
     this.basePatchSpacing = patchSpacing;
@@ -68,9 +68,9 @@ export class MyGrass extends CGFobject {
     this.placementBudgetPerFrame = 3000;
     this.densityScale = 1.0;
     // Rendering culling / LOD
-    this.renderRadius = 90; // full-density radius around camera
-    this.renderRadiusFar = 300; // beyond this radius, skip rendering
-    this.lodFarFactor = 4; // sparsify far patches by this factor
+    this.renderRadius = 60;  // reduced from 90: tighter close-range rendering
+    this.renderRadiusFar = 200;  // reduced from 300: skip farther patches sooner
+    this.lodFarFactor = 6;  // increased from 4: sparsify far patches more aggressively
 
     this.shader = new CGFshader(
       this.scene.gl,
