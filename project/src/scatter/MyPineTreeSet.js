@@ -1,21 +1,46 @@
 import { CGFobject } from "../../../lib/CGF.js";
 import { MyPineTree } from "../entities/MyPineTree.js";
+import { poissonDiskSamples } from "./distribute.js";
 
 export class MyPineTreeSet extends CGFobject {
-  constructor(scene, amount, terrain) {
+  constructor(scene, amount, terrain, predefinedPositions = null) {
     super(scene);
     this.terrain = terrain;
     this.trees = [];
     this.pathClearance = 20; // trees need larger clearance from path and barn
 
-    // generate scattered positions with minimum spacing to avoid clustering
-    const positions = [];
-    const minSpacing = 32; // trees need more spacing
-    const maxAttempts = 60;
+    const positionsToUse = Array.isArray(predefinedPositions) ? predefinedPositions : null;
+    let placedCount = 0;
+    if (positionsToUse) {
+      for (let i = 0; i < positionsToUse.length && placedCount < amount; i++) {
+        const p = positionsToUse[i];
+        const sx = p.x, sz = p.z;
+        if (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(sx, sz, this.pathClearance)) continue;
 
-    for (let i = 0; i < amount; i++) {
-      let x, z;
+        const trunkHeight = 4 + Math.floor(Math.random() * 8); // 4..11
+        const trunkRadius = 1 + Math.floor(Math.random() * 3); // 1..3
+
+        const foliageRadiusMin = Math.max(4, trunkHeight + 1);
+        const foliageRadius = foliageRadiusMin + Math.floor(Math.random() * (12 - foliageRadiusMin + 1));
+        const foliageHeight = foliageRadius + 1 + Math.floor(Math.random() * 2);
+
+        this.trees.push({
+          tree: new MyPineTree(this.scene, trunkHeight, trunkRadius, foliageRadius, foliageHeight),
+          x: sx,
+          y: 0,
+          z: sz,
+          placed: false,
+        });
+        placedCount++;
+      }
+    }
+
+    // fallback: fill remaining with random sampling respecting tree spacing
+    const minSpacing = 32;
+    const maxAttempts = 200;
+    while (placedCount < amount) {
       let attempts = 0;
+      let x, z;
       do {
         const angle = Math.random() * Math.PI * 2;
         const radius = Math.random() * 290;
@@ -24,7 +49,7 @@ export class MyPineTreeSet extends CGFobject {
         attempts++;
         if (attempts > maxAttempts) break;
       } while (
-        positions.some(p => {
+        this.trees.some(p => {
           const dx = p.x - x;
           const dz = p.z - z;
           return dx*dx + dz*dz < minSpacing*minSpacing;
@@ -32,22 +57,22 @@ export class MyPineTreeSet extends CGFobject {
         (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(x, z, this.pathClearance))
       );
 
-      positions.push({x,z});
+      if (attempts > maxAttempts) break;
 
-      const trunkHeight = 4 + Math.floor(Math.random() * 8); // 4..11
-      const trunkRadius = 1 + Math.floor(Math.random() * 3); // 1..3
-
+      const trunkHeight = 4 + Math.floor(Math.random() * 8);
+      const trunkRadius = 1 + Math.floor(Math.random() * 3);
       const foliageRadiusMin = Math.max(4, trunkHeight + 1);
       const foliageRadius = foliageRadiusMin + Math.floor(Math.random() * (12 - foliageRadiusMin + 1));
       const foliageHeight = foliageRadius + 1 + Math.floor(Math.random() * 2);
 
       this.trees.push({
         tree: new MyPineTree(this.scene, trunkHeight, trunkRadius, foliageRadius, foliageHeight),
-        x,
+        x: x,
         y: 0,
-        z,
+        z: z,
         placed: false,
       });
+      placedCount++;
     }
   }
 

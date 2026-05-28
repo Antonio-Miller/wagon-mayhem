@@ -20,7 +20,7 @@ export class MyInterface extends CGFinterface {
         this.gui = new dat.GUI();
         this.gui.add(this.scene, 'displayAxis').name('Display Axis');
         this.gui.add(this.scene, 'sunEnabled').name('Sun On');
-        this.gui.add(this.scene, 'timeOfDay', 0, 24).name('Time of Day').step(0.5);
+        this.gui.add(this.scene, 'timeOfDay', 0, 24).name('Time of Day').step(0.5).listen();
         this.gui.add(this.scene, 'grassAmount', 0.25, 1.0).name('Grass Amount').step(0.05)
             .onFinishChange((value) => {
                 if (this.scene && typeof this.scene.setGrassAmount === 'function') {

@@ -1,8 +1,9 @@
 import { CGFobject, CGFappearance } from "../../../lib/CGF.js";
 import { MyRock } from "../entities/MyRock.js";
+import { poissonDiskSamples } from "./distribute.js";
 
 export class MyRockSet extends CGFobject {
-  constructor(scene, amount, terrain) {
+  constructor(scene, amount, terrain, predefinedPositions = null) {
     super(scene);
     this.terrain = terrain;
     this.rocks = [];
@@ -16,14 +17,44 @@ export class MyRockSet extends CGFobject {
     this.rockMaterial.setShininess(10);
     
     // Pre-generate the rock transforms and geometry
-    // generate scattered positions with minimum spacing to avoid clustering
-    const positions = [];
-    const minSpacing = 12; // minimum distance between rocks
-    const maxAttempts = 50;
+    const positionsToUse = Array.isArray(predefinedPositions) ? predefinedPositions : null;
+    let placedCount = 0;
+    if (positionsToUse) {
+      for (let i = 0; i < positionsToUse.length && placedCount < amount; i++) {
+        const p = positionsToUse[i];
+        const sx = p.x, sz = p.z;
+        if (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(sx, sz, this.pathClearance)) continue;
 
-    for (let i = 0; i < amount; i++) {
-      let x, z;
+        let scaleX = 1.8 + Math.random() * 3.2;
+        let scaleY = 1.8 + Math.random() * 3.2;
+        let scaleZ = 1.8 + Math.random() * 3.2;
+        let rotX = Math.random() * Math.PI;
+        let rotY = Math.random() * Math.PI;
+        let rotZ = Math.random() * Math.PI;
+
+        this.rocks.push({
+          rock: new MyRock(this.scene),
+          x: sx,
+          y: 0,
+          z: sz,
+          scaleX: scaleX,
+          scaleY: scaleY,
+          scaleZ: scaleZ,
+          rotX: rotX,
+          rotY: rotY,
+          rotZ: rotZ,
+          placed: false
+        });
+        placedCount++;
+      }
+    }
+
+    // If we still need more, fall back to random sampling with spacing checks
+    const maxAttempts = 200;
+    const minSpacing = 12;
+    while (placedCount < amount) {
       let attempts = 0;
+      let x, z;
       do {
         const angle = Math.random() * Math.PI * 2;
         const radius = Math.random() * 290;
@@ -32,7 +63,7 @@ export class MyRockSet extends CGFobject {
         attempts++;
         if (attempts > maxAttempts) break;
       } while (
-        positions.some(p => {
+        this.rocks.some(p => {
           const dx = p.x - x;
           const dz = p.z - z;
           return dx*dx + dz*dz < minSpacing*minSpacing;
@@ -40,31 +71,29 @@ export class MyRockSet extends CGFobject {
         (this.terrain?.isPointForbidden && this.terrain.isPointForbidden(x, z, this.pathClearance))
       );
 
-      positions.push({x, z});
-        
-        // Randomize sizes to make them larger and more irregular
-        let scaleX = 1.8 + Math.random() * 3.2;
-        let scaleY = 1.8 + Math.random() * 3.2;
-        let scaleZ = 1.8 + Math.random() * 3.2;
-        
-        // Random orientation
-        let rotX = Math.random() * Math.PI;
-        let rotY = Math.random() * Math.PI;
-        let rotZ = Math.random() * Math.PI;
+      if (attempts > maxAttempts) break;
 
-        this.rocks.push({
-          rock: new MyRock(this.scene),
-          x: x,
-          y: 0,
-          z: z,
-            scaleX: scaleX, 
-            scaleY: scaleY, 
-            scaleZ: scaleZ,
-            rotX: rotX, 
-            rotY: rotY, 
-            rotZ: rotZ,
-            placed: false // We cannot set their Y properly until the terrain's heightmap image has finished loading!
-        });
+      let scaleX = 1.8 + Math.random() * 3.2;
+      let scaleY = 1.8 + Math.random() * 3.2;
+      let scaleZ = 1.8 + Math.random() * 3.2;
+      let rotX = Math.random() * Math.PI;
+      let rotY = Math.random() * Math.PI;
+      let rotZ = Math.random() * Math.PI;
+
+      this.rocks.push({
+        rock: new MyRock(this.scene),
+        x: x,
+        y: 0,
+        z: z,
+        scaleX: scaleX,
+        scaleY: scaleY,
+        scaleZ: scaleZ,
+        rotX: rotX,
+        rotY: rotY,
+        rotZ: rotZ,
+        placed: false
+      });
+      placedCount++;
     }
   }
 

@@ -7,6 +7,7 @@ import { MyRockSet } from "./scatter/MyRockSet.js";
 import { MyHayBaleRound } from "./entities/MyHayBaleRound.js";
 import { MyHaySet } from "./scatter/MyHaySet.js";
 import { MyPineTreeSet } from "./scatter/MyPineTreeSet.js";
+import { poissonDiskSamples } from "./scatter/distribute.js";
 import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
 import { MyBarn } from "./entities/MyBarn.js";
@@ -23,7 +24,7 @@ import { GameState } from "./GameState.js";
 export class MyScene extends CGFscene {
   constructor() {
     super();
-    this.timeOfDay = 12;
+    this.timeOfDay = 9; // start at 09:00
     this.playerInput = {
       w: false,
       a: false,
@@ -168,8 +169,55 @@ export class MyScene extends CGFscene {
     );
 
     this.grass = new MyGrass(this, this.terrain);
-    this.rocks = new MyRockSet(this, 20, this.terrain);
-    this.pineTrees = new MyPineTreeSet(this, 20, this.terrain);
+
+    // Mixed dispersion for trees and rocks using shared Poisson-disc samples
+    const rockCount = 20;
+    const treeCount = 20;
+    const samples = poissonDiskSamples(290, 12, 30);
+    const rockPositions = [];
+    const treePositions = [];
+    const minTree = 32;
+    const minRock = 12;
+
+    // Assign samples to trees and rocks with spacing checks
+    for (let i = 0; i < samples.length && (rockPositions.length < rockCount || treePositions.length < treeCount); i++) {
+      const [sx, sz] = samples[i];
+      // try to place a tree first if we still need trees
+      if (treePositions.length < treeCount) {
+        let ok = true;
+        for (const t of treePositions) {
+          const dx = t.x - sx; const dz = t.z - sz;
+          if (dx*dx + dz*dz < minTree*minTree) { ok = false; break; }
+        }
+        if (ok) {
+          for (const r of rockPositions) {
+            const dx = r.x - sx; const dz = r.z - sz;
+            if (dx*dx + dz*dz < minTree*minTree) { ok = false; break; }
+          }
+        }
+        if (ok) { treePositions.push({x: sx, z: sz}); continue; }
+      }
+
+      // try to place a rock
+      if (rockPositions.length < rockCount) {
+        let ok = true;
+        for (const r of rockPositions) {
+          const dx = r.x - sx; const dz = r.z - sz;
+          if (dx*dx + dz*dz < minRock*minRock) { ok = false; break; }
+        }
+        if (ok) {
+          for (const t of treePositions) {
+            const dx = t.x - sx; const dz = t.z - sz;
+            if (dx*dx + dz*dz < minRock*minRock) { ok = false; break; }
+          }
+        }
+        if (ok) { rockPositions.push({x: sx, z: sz}); continue; }
+      }
+    }
+
+    // pass predefined positions to sets (they will fallback if incomplete)
+    this.pineTrees = new MyPineTreeSet(this, treeCount, this.terrain, treePositions);
+    this.rocks = new MyRockSet(this, rockCount, this.terrain, rockPositions);
     this.flowers = new MyFlowerSet(this, 40, this.terrain, this.rocks, this.pineTrees);
     this.physics = new MyPhysicsEngine(this, {
       gravity: -24.0,
@@ -1616,6 +1664,15 @@ export class MyScene extends CGFscene {
       this._lastActorChoice = this.actorChoice;
     }
 
+    // Advance time of day: 5 hours every 5 real seconds -> 1 hour/sec (10x faster)
+    // (deltaTime is in seconds; deltaTime * 1.0 -> hours advanced)
+    if (deltaTime > 0 && this.timeOfDay !== undefined) {
+      const gameOver = this.gameState ? this.gameState.isGameOver() : false;
+      if (!gameOver) {
+        this.timeOfDay = (this.timeOfDay + deltaTime * 0.01) % 24;
+      }
+    }
+
     if (this.actorChoice !== 'Wagon') {
       this.actionInput.pickup = false;
       this.actionInput.drop = false;
@@ -1856,6 +1913,32 @@ export class MyScene extends CGFscene {
     ctx.strokeStyle = 'rgba(200, 180, 100, 0.8)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(barX, baleCounterY, barWidth, baleCounterHeight);
+
+    // ═══════════════════════════════════════════════════════
+    // Clock Display (Below Bale Counter)
+    // ═══════════════════════════════════════════════════════
+    const clockY = baleCounterY + baleCounterHeight + 12;
+    const clockHeight = 26;
+
+    // Background (semi-transparent dark box)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(barX - 5, clockY - 5, barWidth + 10, clockHeight + 10);
+
+    // Format time as HH:MM
+    const hours = Math.floor(this.timeOfDay);
+    const minutes = Math.floor((this.timeOfDay % 1) * 60);
+    const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+    // Clock display (large, centered)
+    ctx.fillStyle = 'rgb(255, 200, 100)';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(timeString, barX + barWidth / 2, clockY + 18);
+
+    // Border
+    ctx.strokeStyle = 'rgba(255, 200, 100, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(barX, clockY, barWidth, clockHeight);
 
     // ═══════════════════════════════════════════════════════
     // Game Over Message
