@@ -39,11 +39,27 @@ export class GameState {
   }
 
   /**
+   * Restore wagon health.
+   */
+  healWagon(amount = 10) {
+    const previousHealth = this.wagonHealth;
+    this.wagonHealth = Math.min(this.wagonMaxHealth, this.wagonHealth + amount);
+    return this.wagonHealth > previousHealth;
+  }
+
+  /**
    * Update collision cooldown timer.
    */
   update(deltaTime) {
     if (this.wagonCollisionCooldown > 0) {
       this.wagonCollisionCooldown -= deltaTime;
+    }
+
+    if (this.gameState !== 'GAME_OVER' && deltaTime > 0) {
+      this.wagonHealth = Math.max(0, this.wagonHealth - deltaTime);
+      if (this.wagonHealth <= 0) {
+        this.gameState = 'GAME_OVER';
+      }
     }
   }
 

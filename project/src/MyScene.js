@@ -1278,7 +1278,10 @@ export class MyScene extends CGFscene {
     hay.x = dropX;
     hay.y = dropY;
     hay.z = dropZ;
-    this.gameState.removeBales(1);
+    const delivered = this.gameState.deliverBales(1);
+    if (delivered > 0) {
+      this.gameState.healWagon(10);
+    }
     return true;
   }
 
@@ -1634,6 +1637,10 @@ export class MyScene extends CGFscene {
     }
     this.clouds.update(deltaTime);
 
+    if (this.gameState) {
+      this.gameState.update(deltaTime);
+    }
+
     if (this.grass) {
       this.grass.update(this.time);
     }
@@ -1654,8 +1661,6 @@ export class MyScene extends CGFscene {
       });
 
       this.updateHayWagonCollisions(deltaTime);
-
-      this.updateHayStaticCollisions(deltaTime);
 
       // constrain wagon against world geometry
       this.constrainWagonPosition(this.wagon);
@@ -1791,12 +1796,12 @@ export class MyScene extends CGFscene {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // ═══════════════════════════════════════════════════════
-    // Health Bar (Bottom-Left)
+    // Health Bar (Top-Left)
     // ═══════════════════════════════════════════════════════
     const barX = 20;
-    const barY = canvas.height - 50;
-    const barWidth = 200;
-    const barHeight = 30;
+    const barY = 20;
+    const barWidth = 320;
+    const barHeight = 24;
     const healthPercent = this.gameState.getHealthPercent();
     const healthBarWidth = (healthPercent / 100) * barWidth;
 
@@ -1804,14 +1809,8 @@ export class MyScene extends CGFscene {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(barX - 5, barY - 5, barWidth + 10, barHeight + 10);
 
-    // Health bar color: Green -> Yellow -> Red
-    if (healthPercent > 50) {
-      ctx.fillStyle = `rgb(100, 255, 100)`;
-    } else if (healthPercent > 25) {
-      ctx.fillStyle = `rgb(255, 255, 50)`;
-    } else {
-      ctx.fillStyle = `rgb(255, 50, 50)`;
-    }
+    // Health bar color: solid red
+    ctx.fillStyle = 'rgb(220, 40, 40)';
 
     // Draw health bar
     ctx.fillRect(barX, barY, healthBarWidth, barHeight);
@@ -1830,6 +1829,33 @@ export class MyScene extends CGFscene {
       barX + barWidth / 2,
       barY + barHeight / 2 + 5
     );
+
+    // ═══════════════════════════════════════════════════════
+    // Bale Counter (Below Health Bar)
+    // ═══════════════════════════════════════════════════════
+    const baleCounterY = barY + barHeight + 12;
+    const baleCounterHeight = 20;
+
+    // Background (semi-transparent dark box)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(barX - 5, baleCounterY - 5, barWidth + 10, baleCounterHeight + 10);
+
+    // Label
+    ctx.fillStyle = 'rgba(200, 180, 100, 0.9)';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Bales Delivered:', barX + 8, baleCounterY + 15);
+
+    // Count value (gold/amber color for contrast)
+    ctx.fillStyle = 'rgb(255, 215, 0)';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${this.gameState.totalBalesDelivered}`, barX + barWidth - 8, baleCounterY + 15);
+
+    // Border
+    ctx.strokeStyle = 'rgba(200, 180, 100, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(barX, baleCounterY, barWidth, baleCounterHeight);
 
     // ═══════════════════════════════════════════════════════
     // Game Over Message

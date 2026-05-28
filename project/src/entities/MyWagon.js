@@ -162,19 +162,16 @@ export class MyWagon {
     const STEER_RETURN = 2.5;   // rad/s back to centre
     const FRICTION     = 5.0;   // passive slow-down
     const forwardGear = Math.max(1, keys?.wagonForwardGear ?? 1);
-    const reverseGear = Math.max(1, keys?.wagonReverseGear ?? 1);
 
     // ── Acceleration / braking ──
-    // SPACE applies an immediate brake (while held) that reduces speed toward 0
-    if (keys["Space"]) {
+    // S applies an immediate brake (while held) that reduces speed toward 0
+    if (keys["KeyS"]) {
       if (this.speed > 0) this.speed = Math.max(this.speed - DECEL * deltaTime, 0);
       else this.speed = Math.min(this.speed + DECEL * deltaTime, 0);
     }
-    // W accelerates forward, S decelerates and can go into negative (reverse)
+    // W accelerates forward; reverse driving is disabled
     else if (keys["KeyW"]) {
       this.speed = Math.min(this.speed + (ACCEL * forwardGear) * deltaTime, MAX_SPEED * forwardGear);
-    } else if (keys["KeyS"]) {
-      this.speed = Math.max(this.speed - (DECEL * reverseGear) * deltaTime, -MAX_SPEED * reverseGear);
     } else {
       // Friction: bring speed toward zero from either positive or negative
       if (this.speed > 0) this.speed = Math.max(this.speed - FRICTION * deltaTime, 0);
@@ -241,11 +238,6 @@ export class MyWagon {
       const gearExtra = Math.max(0, (gear || 1) - 1);
       const spinScale = (this.wheelSpinBaseScale || 1.0) + (this.wheelSpinPerGear || 0.25) * gearExtra;
       this.wheelAngle += (this.speed / Math.max(1e-6, this.wheelRadius)) * deltaTime * spinScale;
-
-    // ── Update GameState cooldown ──
-    if (this.gameState) {
-      this.gameState.update(deltaTime);
-    }
 
     // ── Instant reset (R key) ──
     if (keys["KeyR"]) {
