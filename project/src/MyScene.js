@@ -58,6 +58,7 @@ export class MyScene extends CGFscene {
     
     // Game state manager
     this.gameState = new GameState();
+    this.isPaused = false;
   }
 
   // Actor switching removed; only Wagon is supported
@@ -465,6 +466,53 @@ export class MyScene extends CGFscene {
   }
 
   // Ball actor removed: initPlayerBall() deleted
+
+  clearGameplayInputs() {
+    this.playerInput = {
+      w: false,
+      a: false,
+      s: false,
+      d: false,
+      space: false,
+    };
+
+    this.actionInput.pickup = false;
+    this.actionInput.drop = false;
+
+    if (this.keys) {
+      this.keys.KeyW = false;
+      this.keys.KeyA = false;
+      this.keys.KeyS = false;
+      this.keys.KeyD = false;
+      this.keys.KeyP = false;
+      this.keys.KeyL = false;
+      this.keys.Space = false;
+      this.keys.wagonForwardGear = 1;
+      this.keys.wagonReverseGear = 1;
+    }
+
+    if (this.wagonDriveState) {
+      if (this.wagonDriveState.w) {
+        this.wagonDriveState.w.pressed = false;
+        this.wagonDriveState.w.gear = 1;
+      }
+      if (this.wagonDriveState.s) {
+        this.wagonDriveState.s.pressed = false;
+        this.wagonDriveState.s.gear = 1;
+      }
+    }
+  }
+
+  togglePause() {
+    if (this.gameState?.isGameOver()) {
+      return;
+    }
+
+    this.isPaused = !this.isPaused;
+    if (this.isPaused) {
+      this.clearGameplayInputs();
+    }
+  }
 
   resetGameFromGameOver() {
     if (!this.gameState || !this.gameState.isGameOver()) {
@@ -1238,6 +1286,10 @@ export class MyScene extends CGFscene {
       this.keys.KeyR = false;
     }
 
+    if (this.isPaused) {
+      return;
+    }
+
     // Advance time of day: 5 hours every 5 real seconds -> 1 hour/sec (10x faster)
     // (deltaTime is in seconds; deltaTime * 1.0 -> hours advanced)
     if (deltaTime > 0 && this.timeOfDay !== undefined) {
@@ -1531,6 +1583,67 @@ export class MyScene extends CGFscene {
       ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
       ctx.font = '20px Arial';
       ctx.fillText('Press R to reset the game', canvas.width / 2, canvas.height / 2 + 80);
+      return;
+    }
+
+    if (this.isPaused) {
+      // Dimmed fullscreen backdrop
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const panelWidth = Math.min(760, canvas.width * 0.88);
+      const panelHeight = Math.min(700, canvas.height * 0.84);
+      const panelX = (canvas.width - panelWidth) * 0.5;
+      const panelY = (canvas.height - panelHeight) * 0.5;
+
+      // Main panel
+      ctx.fillStyle = 'rgba(24, 24, 24, 0.92)';
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.strokeStyle = 'rgba(255, 220, 140, 0.95)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+      const centerX = panelX + panelWidth * 0.5;
+      let y = panelY + 62;
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = 'rgba(255, 230, 170, 1)';
+      ctx.font = 'bold 64px Arial';
+      ctx.fillText('PAUSED', centerX, y);
+
+      y += 72;
+      ctx.fillStyle = 'rgba(220, 220, 220, 0.95)';
+      ctx.font = 'bold 30px Arial';
+      ctx.fillText('Controls', centerX, y);
+
+      const controls = [
+        'W - Accelerate wagon',
+        'Double tap W - Faster gear',
+        'A/D - Steer wagon',
+        'S - Stop wagon',
+        'P - Pick up nearest hay bale',
+        'L - Drop carried hay bale in barn drop area',
+        'SHIFT - Cycle camera mode',
+        'R - Reset game (when Game Over)',
+        'ESC - Resume game',
+      ];
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(240, 240, 240, 0.95)';
+      ctx.font = '24px Arial';
+      const textX = panelX + 56;
+      y += 56;
+      for (const line of controls) {
+        ctx.fillText(line, textX, y);
+        y += 50;
+      }
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 210, 130, 0.95)';
+      ctx.font = 'bold 26px Arial';
+      ctx.fillText('Press ESC to continue', centerX, panelY + panelHeight - 54);
     }
   }
 }

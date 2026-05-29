@@ -46,6 +46,14 @@ export class MyInterface extends CGFinterface {
             const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
             const code = ev && ev.code ? ev.code : '';
 
+            if (code === 'Escape' || key === 'escape') {
+                if (self.scene && typeof self.scene.togglePause === 'function') {
+                    self.scene.togglePause();
+                }
+                ev.preventDefault();
+                return;
+            }
+
             if (gameKeys.indexOf(key) !== -1) {
                 if (self.scene) self.scene.keys[code] = true;
             }
