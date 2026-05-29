@@ -1,5 +1,6 @@
 import { CGFobject, CGFappearance, CGFtexture } from "../../../lib/CGF.js";
 import { MyRock } from "../entities/MyRock.js";
+import { getArrayPool } from "../utils/ObjectPool.js";
 
 export class MyRockSet extends CGFobject {
   constructor(scene, amount, terrain, predefinedPositions = null) {
@@ -84,6 +85,7 @@ export class MyRockSet extends CGFobject {
 
     const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
     const rockRenderDist = 250;  // Render rocks within 250 units of camera
+    const arrayPool = getArrayPool();
 
     // Since the heightmap image runs asynchronously, we check its height 
     // dynamically right before displaying. Once we get a valid heightmap,
@@ -121,6 +123,7 @@ export class MyRockSet extends CGFobject {
       r.rock.display();
       this.scene.popMatrix();
     }
+    arrayPool.releaseAll();
     this.scene.enableTextures(prevTextures);
   }
 }

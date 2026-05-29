@@ -4,6 +4,7 @@ import { MyCylinder } from "../primitives/MyCylinder.js";
 import { MyOBJModel } from "../MyOBJModel.js";
 import { MyWheel } from "./MyWheel.js";
 import { MyWagonCover } from "./MyWagonCover.js";
+import { getArrayPool } from "../utils/ObjectPool.js";
 
 /**
  * MyWagon — Hierarchical covered-wagon (prairie schooner) model.
@@ -294,6 +295,7 @@ export class MyWagon {
     const wagonRadius = Math.max(this.bodyWidth, this.bodyLength) / 2 + 1.5;
     const collisionDamage = 10;
     const currentContacts = new Set();
+    const arrayPool = getArrayPool();
 
     const registerContact = (contactId) => {
       currentContacts.add(contactId);
@@ -369,6 +371,7 @@ export class MyWagon {
     }
 
     this.activeCollisionContacts = currentContacts;
+    arrayPool.releaseAll();
 
     // ════════════════════════════════════════
     // BARN is SAFE - no damage

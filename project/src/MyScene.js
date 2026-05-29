@@ -42,7 +42,7 @@ export class MyScene extends CGFscene {
       drop: false,
     };
     this.grassAmount = 0.4;    // 40% density: balances visuals with performance
-    this.renderDistance = 650;  // ~65% of max: reduces far-LOD overhead
+    this.renderDistance = 1000;
     this.carriedHayBales = [];
     this.maxCarriedHayBales = 2;
     this.barnDropSlot = 0;
@@ -151,7 +151,7 @@ export class MyScene extends CGFscene {
     // Pass precomputed positions to sets; placement generation is centralized in distribute.js
     this.pineTrees = new MyPineTreeSet(this, treeCount, this.terrain, treePositions);
     this.rocks = new MyRockSet(this, rockCount, this.terrain, rockPositions);
-    this.flowers = new MyFlowerSet(this, 12, this.terrain, this.rocks, this.pineTrees);  // Reduced from 20 to 12 for performance
+    this.flowers = new MyFlowerSet(this, 20, this.terrain, this.rocks, this.pineTrees);
     this.physics = new MyPhysicsEngine(this, {
       gravity: -24.0,
       terminalVelocity: -90.0,
@@ -1433,7 +1433,6 @@ export class MyScene extends CGFscene {
       }
       this.wagon.updateTerrainAlignment(this.terrain, deltaTime);
       this.processHayActions();
-      
       // Make camera follow wagon when it's active
       if (this.camera && typeof this.camera.follow === 'function') {
         const target = vec3.fromValues(this.wagon.x, this.wagon.y, this.wagon.z);
