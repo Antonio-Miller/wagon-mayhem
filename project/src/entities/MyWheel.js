@@ -1,4 +1,4 @@
-import { CGFappearance } from "../../../lib/CGF.js";
+import { CGFappearance, CGFtexture } from "../../../lib/CGF.js";
 import { MyTorus } from "../primitives/MyTorus.js";
 import { MyCylinder } from "../primitives/MyCylinder.js";
 
@@ -39,12 +39,15 @@ export class MyWheel {
     const spokeLen = radius - hubRadius - rimThickness;
     this.spoke = new MyCylinder(scene, 6, spokeLen, 0.07, 0.05, false);
 
-    // ── Dark wood appearance ──
+    // ── Dark wood appearance (textured) ──
+    this.woodTexture = new CGFtexture(scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
     this.material = new CGFappearance(scene);
     this.material.setAmbient(0.25, 0.15, 0.06, 1);
     this.material.setDiffuse(0.50, 0.30, 0.12, 1);
     this.material.setSpecular(0.15, 0.10, 0.05, 1);
     this.material.setShininess(10);
+    this.material.setTexture(this.woodTexture);
+    this.material.setTextureWrap("REPEAT", "REPEAT");
   }
 
   display() {
