@@ -537,6 +537,18 @@ export class MyWagon {
     this.scene.scale(this.bodyWidth, wh, wt);
     this.cube.display();
     this.scene.popMatrix();
+
+    // Driver's bench — outside the front wall (driver's seat)
+    const benchWidth  = this.bodyWidth - 0.6;
+    const benchHeight = 0.40;
+    const benchDepth  = 1.2;
+    this.darkWoodMat.apply();
+    this.scene.pushMatrix();
+    this.scene.translate(0, fy + ft + benchHeight / 2, hl + benchDepth / 2 + 0.1);
+    this.scene.scale(benchWidth, benchHeight, benchDepth);
+    this.cube.display();
+    this.scene.popMatrix();
+    this.woodMat.apply();
   }
 
   // ────────────────────────────────────────────────────────
