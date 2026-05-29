@@ -33,9 +33,7 @@ export class MyInterface extends CGFinterface {
                     this.scene.setRenderDistance(value);
                 }
             });
-        // Choose active actor: Ball or Wagon
-        // default is set in the scene (this.scene.actorChoice)
-        this.gui.add(this.scene, 'actorChoice', ['Ball', 'Wagon']).name('Active Actor');
+        // Actor selection removed; Wagon is the only actor
 
         // ── Keyboard state ───────────────────────────────────
         // Game keys: WASD (movement), P (pickup), L (drop), R (reset)

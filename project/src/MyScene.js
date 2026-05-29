@@ -12,7 +12,7 @@ import { MyGrass } from "./entities/MyGrass.js";
 import { MyFlowerSet } from "./scatter/MyFlowerSet.js";
 import { MyBarn } from "./entities/MyBarn.js";
 import { MyBarnFence } from "./entities/MyBarnFence.js";
-import { MyRollingBall } from "./entities/MyRollingBall.js";
+// MyRollingBall removed — Ball actor is deprecated
 import { MyPhysicsEngine } from "./physics/MyPhysicsEngine.js";
 import { MyWagon } from "./entities/MyWagon.js";
 import { GameState } from "./GameState.js";
@@ -48,66 +48,19 @@ export class MyScene extends CGFscene {
     this.barnDropSlot = 0;
     // Explicit stored hay bale registry (bales delivered to barn via L)
     this.storedHayBales = [];
-    // Active actor choice: 'Ball' or 'Wagon' (default: Wagon)
-    this.actorChoice = 'Wagon';
-    this._lastActorChoice = this.actorChoice;
+    // Wagon spawn location (from previous ball spawn coordinates)
+    this.defaultSpawn = {
+      x: 116.22,
+      z: -175.48,
+      heading: 0,
+    };
+    // Only Wagon actor is supported; actorChoice removed
     
     // Game state manager
     this.gameState = new GameState();
   }
 
-  _switchActiveActor(prev, next) {
-    if (prev === next) return;
-
-    // Switching TO Ball: place ball at wagon's position
-    if (next === 'Ball') {
-      if (this.wagon && this.ballBody) {
-        const x = this.wagon.x;
-        const z = this.wagon.z;
-        const y = this.terrain ? this.terrain.getHeightAt(x, z) + (this.ball?.radius || 0) : (this.ball?.radius || 0);
-        this.ballBody.position[0] = x;
-        this.ballBody.position[1] = y;
-        this.ballBody.position[2] = z;
-        this.ballBody.velocity[0] = 0;
-        this.ballBody.velocity[1] = 0;
-        this.ballBody.velocity[2] = 0;
-        this.ballBody.active = true;
-        this.ballBody.settled = true;
-        this.ballLastPosition = vec3.clone(this.ballBody.position);
-        // copy heading so camera aligns
-        this.ballHeading = this.wagon.heading || 0;
-      }
-    }
-
-    // Switching TO Wagon: place wagon at ball's position
-    if (next === 'Wagon') {
-      if (this.wagon && this.ballBody) {
-        const x = this.ballBody.position[0];
-        const z = this.ballBody.position[2];
-        const y = this.terrain ? this.terrain.getHeightAt(x, z) : 0;
-        this.wagon.x = x;
-        this.wagon.z = z;
-        this.wagon.y = y;
-        this.wagon.heading = this.ballHeading || 0;
-        // disable ball physics so it doesn't fall while wagon is active
-        this.ballBody.velocity[0] = 0;
-        this.ballBody.velocity[1] = 0;
-        this.ballBody.velocity[2] = 0;
-        this.ballBody.active = false;
-        this.ballBody.settled = true;
-      }
-      if (this.keys) {
-        this.keys.wagonForwardGear = 1;
-        this.keys.wagonReverseGear = 1;
-      }
-      if (this.wagonDriveState) {
-        this.wagonDriveState.w.gear = 1;
-        this.wagonDriveState.s.gear = 1;
-        this.wagonDriveState.w.pressed = false;
-        this.wagonDriveState.s.pressed = false;
-      }
-    }
-  }
+  // Actor switching removed; only Wagon is supported
   init(application) {
     super.init(application);
     
@@ -198,21 +151,16 @@ export class MyScene extends CGFscene {
       terminalVelocity: -90.0,
     });
     this.registerPhysicsBodies();
-    this.initPlayerBall();
     this.wagon = new MyWagon(this, this.gameState);
     if (this.wagon && typeof this.wagon.setCarriedHayBales === 'function') {
       this.wagon.setCarriedHayBales(this.carriedHayBales);
     }
-    // Ensure wagon initially spawns at the ball coords
-    if (this.ballBody && this.wagon) {
-      this.wagon.x = this.ballBody.position[0];
-      this.wagon.z = this.ballBody.position[2];
+    // Wagon spawns at default location
+    if (this.wagon && this.defaultSpawn) {
+      this.wagon.x = this.defaultSpawn.x;
+      this.wagon.z = this.defaultSpawn.z;
+      this.wagon.heading = this.defaultSpawn.heading || 0;
       this.wagon.y = this.terrain ? this.terrain.getHeightAt(this.wagon.x, this.wagon.z) : 0;
-    }
-    // If default actor is Wagon, ensure ball physics is disabled so wagon is the active one
-    if (this.actorChoice === 'Wagon' && this.ballBody) {
-      this._switchActiveActor('Ball', 'Wagon');
-      this._lastActorChoice = this.actorChoice;
     }
     this.applyPerformanceSettings();
     this.lastUpdateTime = 0;
@@ -270,8 +218,7 @@ export class MyScene extends CGFscene {
     // Objects connected to MyInterface
     this.displayAxis = true;
     this.sunEnabled = true;
-    // Active actor shown via `actorChoice` (GUI added in MyInterface)
-    this.actorChoice = this.actorChoice || 'Wagon';
+    // Single active actor model (Wagon) - actorChoice removed
   }
   computeSkyFromTime() {
     const t = this.timeOfDay % 24;
@@ -517,62 +464,7 @@ export class MyScene extends CGFscene {
     }
   }
 
-  initPlayerBall() {
-    this.ball = new MyRollingBall(this, 1.4);
-    const startX = 116.22;
-    const startY = 54.88;
-    const startZ = -175.48;
-
-    // Default scene spawn used by reset flow
-    this.defaultSpawn = {
-      x: startX,
-      y: startY,
-      z: startZ,
-      heading: 0,
-    };
-
-    this.ballBody = this.physics.registerBody({
-      name: 'playerBall',
-      position: vec3.fromValues(startX, startY, startZ),
-      velocity: vec3.fromValues(0, 0, 0),
-      gravityScale: 1,
-      groundHeightFn: (position) => {
-        if (this.terrain?.getHeightAt) {
-          return this.terrain.getHeightAt(position[0], position[2]) + this.ball.radius;
-        }
-
-        return this.ball.radius;
-      },
-      onGround: (body) => {
-        body.velocity[1] = 0;
-      },
-    });
-
-    this.ball.setPhysicsBody(this.ballBody);
-    this.ballHeading = 0;
-    this.ballSpeed = 0;
-    this.ballDriveCharge = 0;
-    this.ballMaxSpeed = 7.5;
-    this.ballMaxSprintBonus = 9.5;
-    this.ballAcceleration = 18.0;
-    this.ballFriction = 4.5;
-    this.ballBrake = 11.0;
-    this.ballTurnRate = 1.7;
-    this.ballJumpImpulseMin = 9.0;
-    this.ballJumpImpulseMax = 20.0;
-    this.jumpChargeTime = 0;
-    this.spaceWasPressed = false;
-    this.ballLastPosition = vec3.clone(this.ballBody.position);
-    this.ballBody.velocity[1] = 0;
-    this.ballBody.settled = true;
-
-    // Camera modes: third (default), far, first-person
-    this.cameraModes = ['third', 'far', 'first'];
-    this.cameraModeIndex = 0;
-    this.setCameraMode(this.cameraModes[this.cameraModeIndex]);
-
-    this.camera.follow(this.ballBody.position, this.ballHeading, { smoothing: 1.0 });
-  }
+  // Ball actor removed: initPlayerBall() deleted
 
   resetGameFromGameOver() {
     if (!this.gameState || !this.gameState.isGameOver()) {
@@ -604,255 +496,10 @@ export class MyScene extends CGFscene {
       });
     }
 
-    // Keep the wagon as active actor after reset
-    this.actorChoice = 'Wagon';
-    this._switchActiveActor(this._lastActorChoice, this.actorChoice);
-    this._lastActorChoice = this.actorChoice;
+    // Wagon remains the only actor; nothing to switch
   }
 
-  constrainBallPosition(body) {
-    if (!body) return;
-
-    let hitFenceRail = false; // flag to apply friction if hitting fence
-
-    // Dome boundary (horizontal plane only)
-    const bx = body.position[0];
-    const bz = body.position[2];
-    const horizDist = Math.sqrt(bx * bx + bz * bz);
-    const maxHoriz = Math.max(10, this.domeRadius - (this.ball?.radius ?? 1.0));
-    if (horizDist > maxHoriz) {
-      const scale = maxHoriz / horizDist;
-      body.position[0] = bx * scale;
-      body.position[2] = bz * scale;
-      body.velocity[0] = 0;
-      body.velocity[2] = 0;
-    }
-
-    // Rocks collision: treat rocks as spheres (radius plus ball radius)
-    if (this.rocks && Array.isArray(this.rocks.rocks)) {
-      for (const rock of this.rocks.rocks) {
-        if (!rock.placed) continue;
-        const dx = body.position[0] - rock.x;
-        const dy = body.position[1] - rock.y;
-        const dz = body.position[2] - rock.z;
-        const dist2 = dx * dx + dy * dy + dz * dz;
-        // rock primitive is a unit sphere scaled by scaleX/Y/Z
-        const rockRadius = Math.max(rock.scaleX, rock.scaleY, rock.scaleZ) * 1.0;
-        const clashRadius = rockRadius;
-        if (dist2 > 0 && dist2 < clashRadius * clashRadius) {
-          const dist = Math.sqrt(dist2) || 0.0001;
-          const push = (clashRadius - dist) / dist;
-          body.position[0] += dx * push;
-          body.position[1] += dy * push;
-          body.position[2] += dz * push;
-          body.velocity[0] = 0;
-          body.velocity[2] = 0;
-        }
-      }
-    }
-
-    // Trees collision: check trunk and foliage separately
-    if (this.pineTrees && Array.isArray(this.pineTrees.trees)) {
-      for (const tree of this.pineTrees.trees) {
-        if (!tree.placed) continue;
-        const trunkHeight = tree.tree.trunkHeight;
-        const foliageHeight = tree.tree.foliageHeight;
-        const foliageTop = tree.y + trunkHeight + foliageHeight * 1.92;
-        const trunkTop = tree.y + trunkHeight;
-
-        // Check trunk collision (solid cylinder)
-        if (body.position[1] >= tree.y - 0.1 && body.position[1] <= trunkTop + 0.1) {
-          const dx = body.position[0] - tree.x;
-          const dz = body.position[2] - tree.z;
-          const dist2 = dx * dx + dz * dz;
-          const trunkCollisionRadius = tree.tree.trunkRadius + (this.ball?.radius ?? 1.0);
-          if (dist2 > 0 && dist2 < trunkCollisionRadius * trunkCollisionRadius) {
-            const dist = Math.sqrt(dist2) || 0.0001;
-            const push = (trunkCollisionRadius - dist) / dist;
-            body.position[0] += dx * push;
-            body.position[2] += dz * push;
-            body.velocity[0] = 0;
-            body.velocity[2] = 0;
-            continue;
-          }
-        }
-
-        // Check foliage collision (cone-based)
-        if (body.position[1] < trunkTop || body.position[1] > foliageTop) continue;
-
-        const dx = body.position[0] - tree.x;
-        const dy = body.position[1] - (tree.y + trunkHeight * 0.5);
-        const dz = body.position[2] - tree.z;
-        const dist2 = dx * dx + dy * dy + dz * dz;
-        // approximate foliage collision radius
-        const collisionRadius = Math.max(tree.tree.trunkRadius, tree.tree.foliageRadius) * 1.02 + (this.ball?.radius ?? 1.0);
-        if (dist2 > 0 && dist2 < collisionRadius * collisionRadius) {
-          const dist = Math.sqrt(dist2) || 0.0001;
-          const push = (collisionRadius - dist) / dist;
-          body.position[0] += dx * push;
-          body.position[1] += dy * push;
-          body.position[2] += dz * push;
-          body.velocity[0] = 0;
-          body.velocity[2] = 0;
-        }
-      }
-    }
-
-    // Barn collision (axis-aligned box)
-    if (this.barn) {
-      const halfWidth = this.barn.width / 2 + (this.ball?.radius ?? 1.0) + Math.max(this.barn.width, this.barn.depth) * 0.02;
-      const halfDepth = this.barn.depth / 2 + (this.ball?.radius ?? 1.0) + Math.max(this.barn.width, this.barn.depth) * 0.02;
-      const minX = this.barn.positionX - halfWidth;
-      const maxX = this.barn.positionX + halfWidth;
-      const minZ = this.barn.positionZ - halfDepth;
-      const maxZ = this.barn.positionZ + halfDepth;
-      const baseY = this.barn.positionY ?? (this.terrain ? this.terrain.getHeightAt(this.barn.positionX, this.barn.positionZ) : 0);
-      const topY = baseY + (this.barn.bodyTotalHeight ?? (this.barn.bodyHeight || 20)) + (this.barn.roofHeight || 6);
-
-      // Only collide if ball is within vertical overlap of the barn
-      if (body.position[1] >= baseY - 0.1 && body.position[1] <= topY + 0.1) {
-        if (body.position[0] >= minX && body.position[0] <= maxX && body.position[2] >= minZ && body.position[2] <= maxZ) {
-          // push out along nearest axis
-          const distLeft = body.position[0] - minX;
-          const distRight = maxX - body.position[0];
-          const distFront = body.position[2] - minZ;
-          const distBack = maxZ - body.position[2];
-          const minDist = Math.min(distLeft, distRight, distFront, distBack);
-          if (minDist === distLeft) body.position[0] = minX;
-          else if (minDist === distRight) body.position[0] = maxX;
-          else if (minDist === distFront) body.position[2] = minZ;
-          else body.position[2] = maxZ;
-          body.velocity[0] = 0;
-          body.velocity[2] = 0;
-        }
-      }
-    }
-
-    // Barn fence posts (treat as small cylinders)
-    if (this.barnFence && Array.isArray(this.barnFence.fencePosts)) {
-      for (const post of this.barnFence.fencePosts) {
-        const postBaseY = post.y ?? this.barnFence.getTerrainHeight(post.x, post.z);
-        const postTopY = postBaseY + (this.barnFence.postHeight ?? 4.2);
-        // only collide if ball is within vertical span of the post
-        if (body.position[1] < postBaseY - 0.1 || body.position[1] > postTopY + 0.1) continue;
-
-        const dx = body.position[0] - post.x;
-        const dz = body.position[2] - post.z;
-        const dist2 = dx * dx + dz * dz;
-        const radius = (this.barnFence.postRadius ?? 0.35) + (this.ball?.radius ?? 1.0);
-        if (dist2 > 0 && dist2 < radius * radius) {
-          const dist = Math.sqrt(dist2) || 0.0001;
-          const push = (radius - dist) / dist;
-          body.position[0] += dx * push;
-          body.position[2] += dz * push;
-          body.velocity[0] = 0;
-          body.velocity[2] = 0;
-        }
-      }
-    }
-
-    // Barn fence horizontal rails (connecting cylinders between posts)
-    if (this.barnFence && Array.isArray(this.barnFence.fencePosts)) {
-      const postCount = this.barnFence.fencePosts.length;
-      if (postCount < 2) return; // need at least 2 posts for a rail
-
-      const baseHeight = this.barnFence.baseHeight ?? 0.15;
-      const postHeight = this.barnFence.postHeight ?? 4.2;
-      const horizRadius = this.barnFence.horizontalRadius ?? 0.15;
-      const ballRadius = this.ball?.radius ?? 1.0;
-      const collisionRadiusH = horizRadius + ballRadius;
-
-      for (let i = 0; i < postCount; i++) {
-        const post = this.barnFence.fencePosts[i];
-        const nextPost = this.barnFence.fencePosts[(i + 1) % postCount];
-
-        // Check if posts are consecutive (not across an opening)
-        let isConsecutive = true;
-        if (this.barnFence.fullPostCount && post.index !== undefined && nextPost.index !== undefined) {
-          isConsecutive = ((post.index + 1) % this.barnFence.fullPostCount) === nextPost.index;
-        }
-        if (!isConsecutive) continue;
-
-        const postBaseY = post.y ?? this.barnFence.getTerrainHeight(post.x, post.z);
-        const nextPostBaseY = nextPost.y ?? this.barnFence.getTerrainHeight(nextPost.x, nextPost.z);
-        const avgBaseY = (postBaseY + nextPostBaseY) * 0.5;
-
-        // Two horizontal rails at fixed positions
-        const railHeights = [
-          avgBaseY + baseHeight + postHeight * 0.55, // lower rail
-          avgBaseY + baseHeight + postHeight * 0.86,  // upper rail
-        ];
-
-        for (const railHeight of railHeights) {
-          // Skip if ball is far from the rail height
-          const railDist = Math.abs(body.position[1] - railHeight);
-          if (railDist > 1.5) continue;
-
-          // Line segment from post to nextPost at railHeight
-          const p1x = post.x;
-          const p1z = post.z;
-          const p2x = nextPost.x;
-          const p2z = nextPost.z;
-          const ballX = body.position[0];
-          const ballY = body.position[1];
-          const ballZ = body.position[2];
-
-          const dx = p2x - p1x;
-          const dz = p2z - p1z;
-          const lenSq = dx * dx + dz * dz;
-
-          if (lenSq < 0.001) continue; // degenerate segment
-
-          // Project ball onto segment (in XZ plane)
-          const toBalX = ballX - p1x;
-          const toBalZ = ballZ - p1z;
-          const t = Math.max(0, Math.min(1, (toBalX * dx + toBalZ * dz) / lenSq));
-
-          // Closest point on segment
-          const closestX = p1x + t * dx;
-          const closestZ = p1z + t * dz;
-          const closestY = railHeight; // rail is at fixed height
-
-          // 3D distance from ball to closest point on rail
-          const distX = ballX - closestX;
-          const distY = ballY - closestY;
-          const distZ = ballZ - closestZ;
-          const dist2 = distX * distX + distY * distY + distZ * distZ;
-
-          if (dist2 < collisionRadiusH * collisionRadiusH && dist2 > 0.001) {
-            const dist = Math.sqrt(dist2);
-            const push = (collisionRadiusH - dist) / dist * 1.1; // 1.1 factor to ensure separation
-            body.position[0] += distX * push;
-            body.position[1] += distY * push;
-            body.position[2] += distZ * push;
-            body.velocity[0] = 0;
-            body.velocity[2] = 0;
-            hitFenceRail = true; // flag collision with horizontal rail
-          }
-        }
-      }
-    }
-
-    // Apply friction if ball hit a fence rail to prevent forcing through
-    if (hitFenceRail && this.ballSpeed !== undefined) {
-      this.ballSpeed = Math.max(0, this.ballSpeed * 0.5); // reduce speed by half on rail collision
-    }
-
-    // Apply friction if ball hit a fence rail to prevent forcing through
-    if (hitFenceRail && this.ballSpeed !== undefined) {
-      this.ballSpeed = Math.max(0, this.ballSpeed * 0.5); // reduce speed by half on rail collision
-    }
-
-    // Terrain collision: ensure ball stays above terrain surface
-    if (this.terrain && typeof this.terrain.getHeightAt === 'function') {
-      const terrainHeight = this.terrain.getHeightAt(body.position[0], body.position[2]);
-      const minY = terrainHeight + (this.ball?.radius ?? 1.0);
-      if (body.position[1] < minY) {
-        body.position[1] = minY;
-        body.velocity[1] = 0; // stop downward velocity when hitting terrain
-      }
-    }
-  }
+  // Ball collision handling removed
 
   constrainWagonPosition(wagon) {
     if (!wagon) return;
@@ -1157,13 +804,9 @@ export class MyScene extends CGFscene {
       this.playerInput.space = true;
       // Start charging jump (don't apply immediately)
     } else if (key === 'p') {
-      if (this.actorChoice === 'Wagon' && !event.repeat) {
-        this.actionInput.pickup = true;
-      }
+        if (!event.repeat) this.actionInput.pickup = true;
     } else if (key === 'l') {
-      if (this.actorChoice === 'Wagon' && !event.repeat) {
-        this.actionInput.drop = true;
-      }
+        if (!event.repeat) this.actionInput.drop = true;
     }
   }
 
@@ -1558,98 +1201,9 @@ export class MyScene extends CGFscene {
     }
   }
 
-  updatePlayerBallControl(deltaTime) {
-    if (!this.ballBody) {
-      return;
-    }
+  // Ball player controls removed
 
-    if (this.playerInput.w) {
-      this.ballDriveCharge = Math.min(1, this.ballDriveCharge + deltaTime * 0.45);
-      this.ballSpeed = Math.min(
-        this.ballSpeed + this.ballAcceleration * deltaTime,
-        this.ballMaxSpeed + this.ballMaxSprintBonus * this.ballDriveCharge
-      );
-    } else {
-      this.ballDriveCharge = Math.max(0, this.ballDriveCharge - deltaTime * 0.2);
-      this.ballSpeed = Math.max(0, this.ballSpeed - this.ballFriction * deltaTime);
-    }
-
-    if (this.playerInput.s) {
-      this.ballSpeed = Math.max(0, this.ballSpeed - this.ballBrake * deltaTime);
-    }
-
-    const turnInput = (this.playerInput.d ? 1 : 0) - (this.playerInput.a ? 1 : 0);
-    if (turnInput !== 0) {
-      const speedFactor = this.ballSpeed > 0 ? Math.min(1, this.ballSpeed / Math.max(1, this.ballMaxSpeed)) : 0.15;
-      this.ballHeading -= turnInput * this.ballTurnRate * deltaTime * (0.35 + 0.65 * speedFactor);
-    }
-
-    const forwardX = Math.sin(this.ballHeading);
-    const forwardZ = Math.cos(this.ballHeading);
-    this.ballBody.velocity[0] = forwardX * this.ballSpeed;
-    this.ballBody.velocity[2] = forwardZ * this.ballSpeed;
-
-    // Variable jump height: charge while space is held, jump on release
-    if (this.playerInput.space) {
-      // Space is currently pressed: accumulate charge time (only if on ground)
-      if (this.ballBody.settled) {
-        const maxChargeTime = 0.5; // max charge duration in seconds
-        this.jumpChargeTime = Math.min(maxChargeTime, this.jumpChargeTime + deltaTime);
-      }
-      this.spaceWasPressed = true;
-    } else if (this.spaceWasPressed) {
-      // Space was just released: apply jump based on charge time
-      if (this.ballBody.settled && this.jumpChargeTime > 0) {
-        // Interpolate between min and max impulse based on charge percentage
-        const chargePercent = Math.min(1, this.jumpChargeTime / 0.5);
-        const jumpImpulse = this.ballJumpImpulseMin + (this.ballJumpImpulseMax - this.ballJumpImpulseMin) * chargePercent;
-        this.ballBody.velocity[1] = jumpImpulse;
-      }
-      // Reset charge time and state
-      this.jumpChargeTime = 0;
-      this.spaceWasPressed = false;
-    }
-  }
-
-  updateBallAfterPhysics() {
-    if (!this.ballBody || !this.ball) {
-      return;
-    }
-
-    const currentPosition = this.ballBody.position;
-    const deltaX = currentPosition[0] - this.ballLastPosition[0];
-    const deltaZ = currentPosition[2] - this.ballLastPosition[2];
-
-    this.ball.applyRollingFromDelta(deltaX, deltaZ);
-    this.ballLastPosition[0] = currentPosition[0];
-    this.ballLastPosition[1] = currentPosition[1];
-    this.ballLastPosition[2] = currentPosition[2];
-
-    // Camera follow behavior depends on current camera mode
-    if (this.cameraMode === 'first') {
-      // First person: position camera at ball's eye level and look forward along heading
-      const eyeOffsetY = Math.max(0.2, this.ball.radius * 0.6);
-      const px = currentPosition[0];
-      const py = currentPosition[1] + eyeOffsetY;
-      const pz = currentPosition[2];
-
-      // place camera slightly in front of ball to avoid clipping - move along forward vector
-      const forwardX = Math.sin(this.ballHeading);
-      const forwardZ = Math.cos(this.ballHeading);
-      this.camera.position[0] = px + forwardX * 0.12;
-      this.camera.position[1] = py + 0.12;
-      this.camera.position[2] = pz + forwardZ * 0.12;
-
-      // target a point ahead of the ball
-      this.camera.target[0] = px + forwardX * 3.0;
-      this.camera.target[1] = py;
-      this.camera.target[2] = pz + forwardZ * 3.0;
-      this.camera.direction = this.camera.calculateDirection();
-    } else {
-      // third / far modes: use follow logic
-      this.camera.follow(currentPosition, this.ballHeading);
-    }
-  }
+  // Ball post-physics update removed
 
   constrainCameraToObjects() {
     const pos = this.camera.position;
@@ -1676,11 +1230,7 @@ export class MyScene extends CGFscene {
 
     const deltaTime = this.lastUpdateTime === 0 ? 0 : (t - this.lastUpdateTime) / 1000;
     this.lastUpdateTime = t;
-    // Detect actor changes and switch state if needed
-    if (this.actorChoice !== this._lastActorChoice) {
-      this._switchActiveActor(this._lastActorChoice, this.actorChoice);
-      this._lastActorChoice = this.actorChoice;
-    }
+    // Single-actor model: no actor change detection needed
 
     // Reset is only allowed on Game Over screen
     if (this.gameState?.isGameOver() && this.keys?.KeyR) {
@@ -1697,24 +1247,17 @@ export class MyScene extends CGFscene {
       }
     }
 
-    if (this.actorChoice !== 'Wagon') {
-      this.actionInput.pickup = false;
-      this.actionInput.drop = false;
-    }
+    // Pickup/drop apply to wagon; no actor gating required
 
     if (deltaTime > 0) {
-      // Only route player input to the ball when it's the active actor
-      if (this.actorChoice === 'Ball') this.updatePlayerBallControl(deltaTime);
+      // Player ball controls removed
     }
 
     this.physics?.step(deltaTime);
-    // After physics, constrain ball against world objects before visual update
-    if (this.ballBody && this.actorChoice === 'Ball') {
-      this.constrainBallPosition(this.ballBody);
-    }
+    // Ball actor removed: no physics-time constraints
 
     if (deltaTime > 0) {
-      if (this.actorChoice === 'Ball') this.updateBallAfterPhysics();
+      // Ball post-physics update removed
     }
     this.clouds.update(deltaTime);
 
@@ -1726,8 +1269,8 @@ export class MyScene extends CGFscene {
       this.grass.update(this.time);
     }
 
-    // Wagon physics + snap to terrain (only when active)
-    if (this.actorChoice === 'Wagon') {
+    // Wagon physics + snap to terrain
+    if (this.wagon) {
       this.wagon.update(deltaTime, this.keys);
       if (this.terrain) {
         this.wagon.y = this.terrain.getHeightAt(this.wagon.x, this.wagon.z);
@@ -1826,12 +1369,12 @@ export class MyScene extends CGFscene {
     
     this.barn.display();
     this.barnFence.display();
-    if (this.actorChoice === 'Ball') this.ball.display();
+    // Ball display removed
     
     this.grass.display();
     this.flowers.display();
 
-    if (this.actorChoice === 'Wagon') this.wagon.display();
+    if (this.wagon) this.wagon.display();
 
     // ---- END Primitive drawing section
     
