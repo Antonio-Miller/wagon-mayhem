@@ -35,6 +35,38 @@ export class MyInterface extends CGFinterface {
             });
         // Actor selection removed; Wagon is the only actor
 
+        // ── Game Status folder ───
+        const gs = this.scene.gameState;
+        if (gs) {
+            const statusFolder = this.gui.addFolder('Game Status');
+
+            // Current HP (numeric bar 0–100)
+            statusFolder.add(gs, 'wagonHealth', 0, 100).name('Health (HP)').listen();
+
+            // Instantaneous damage
+            statusFolder.add(gs, 'lastDamage').name('Last Damage').listen();
+
+            // Instantaneous heal
+            statusFolder.add(gs, 'lastHeal').name('Last Heal').listen();
+
+            // Total bales delivered
+            statusFolder.add(gs, 'totalBalesDelivered').name('Bales Delivered').listen();
+
+            // Score (elapsed seconds, formatted)
+            Object.defineProperty(this.scene, '_guiScore', {
+                get() {
+                    const s = gs.score || 0;
+                    const mins = Math.floor(s / 60);
+                    const secs = Math.floor(s % 60);
+                    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                },
+                configurable: true,
+            });
+            statusFolder.add(this.scene, '_guiScore').name('Score (time)').listen();
+
+            statusFolder.open();
+        }
+
         // ── Keyboard state ───────────────────────────────────
         // Game keys: WASD (movement), P (pickup), L (drop), R (reset)
         const gameKeys = ['w', 'a', 's', 'd', 'p', 'l', 'r'];
