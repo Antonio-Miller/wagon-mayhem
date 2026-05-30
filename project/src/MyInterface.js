@@ -33,24 +33,27 @@ export class MyInterface extends CGFinterface {
                     this.scene.setRenderDistance(value);
                 }
             });
-        // Actor selection removed; Wagon is the only actor
 
         // ── Game Status folder ───
         const gs = this.scene.gameState;
         if (gs) {
             const statusFolder = this.gui.addFolder('Game Status');
 
-            // Current HP (numeric bar 0–100)
-            statusFolder.add(gs, 'wagonHealth', 0, 100).name('Health (HP)').listen();
+            // Current HP (numeric bar 0–100) — display-only
+            const healthCtrl = statusFolder.add(gs, 'wagonHealth', 0, 100).name('Health (HP)').listen();
+            try { if (healthCtrl.__li) healthCtrl.__li.style.pointerEvents = 'none'; } catch (e) {}
 
-            // Instantaneous damage
-            statusFolder.add(gs, 'lastDamage').name('Last Damage').listen();
+            // Instantaneous damage — display-only
+            const dmgCtrl = statusFolder.add(gs, 'lastDamage').name('Last Damage').listen();
+            try { if (dmgCtrl.__li) dmgCtrl.__li.style.pointerEvents = 'none'; } catch (e) {}
 
-            // Instantaneous heal
-            statusFolder.add(gs, 'lastHeal').name('Last Heal').listen();
+            // Instantaneous heal — display-only
+            const healCtrl = statusFolder.add(gs, 'lastHeal').name('Last Heal').listen();
+            try { if (healCtrl.__li) healCtrl.__li.style.pointerEvents = 'none'; } catch (e) {}
 
-            // Total bales delivered
-            statusFolder.add(gs, 'totalBalesDelivered').name('Bales Delivered').listen();
+            // Total bales delivered — display-only
+            const balesCtrl = statusFolder.add(gs, 'totalBalesDelivered').name('Bales Delivered').listen();
+            try { if (balesCtrl.__li) balesCtrl.__li.style.pointerEvents = 'none'; } catch (e) {}
 
             // Score (elapsed seconds, formatted)
             Object.defineProperty(this.scene, '_guiScore', {
@@ -62,7 +65,8 @@ export class MyInterface extends CGFinterface {
                 },
                 configurable: true,
             });
-            statusFolder.add(this.scene, '_guiScore').name('Score (time)').listen();
+            const scoreCtrl = statusFolder.add(this.scene, '_guiScore').name('Score (time)').listen();
+            try { if (scoreCtrl.__li) scoreCtrl.__li.style.pointerEvents = 'none'; } catch (e) {}
 
             statusFolder.open();
         }
