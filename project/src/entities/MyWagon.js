@@ -1,9 +1,10 @@
-import { CGFappearance } from "../../../lib/CGF.js";
+import { CGFappearance, CGFtexture } from "../../../lib/CGF.js";
 import { MyUnitCube } from "../primitives/MyUnitCube.js";
 import { MyCylinder } from "../primitives/MyCylinder.js";
 import { MyOBJModel } from "../MyOBJModel.js";
 import { MyWheel } from "./MyWheel.js";
 import { MyWagonCover } from "./MyWagonCover.js";
+import { getArrayPool } from "../utils/ObjectPool.js";
 
 /**
  * MyWagon — Hierarchical covered-wagon (prairie schooner) model.
@@ -76,19 +77,26 @@ export class MyWagon {
     this.cover = new MyWagonCover(scene, this.bodyWidth, this.bodyLength / 2, 16, 8, 5);
 
     // ═══════════════════ Materials ═══════════════════
+    // Wood plank texture (shared by both light and dark wood)
+    this.woodTexture = new CGFtexture(scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
+
     // Light wood — body
     this.woodMat = new CGFappearance(scene);
     this.woodMat.setAmbient(0.40, 0.26, 0.10, 1);
     this.woodMat.setDiffuse(0.62, 0.42, 0.18, 1);
     this.woodMat.setSpecular(0.15, 0.10, 0.05, 1);
     this.woodMat.setShininess(12);
+    this.woodMat.setTexture(this.woodTexture);
+    this.woodMat.setTextureWrap("REPEAT", "REPEAT");
 
-    // Dark wood — tongue / under-carriage
+    // Dark wood — tongue / under-carriage / bench
     this.darkWoodMat = new CGFappearance(scene);
     this.darkWoodMat.setAmbient(0.22, 0.13, 0.05, 1);
     this.darkWoodMat.setDiffuse(0.40, 0.24, 0.10, 1);
     this.darkWoodMat.setSpecular(0.10, 0.08, 0.04, 1);
     this.darkWoodMat.setShininess(8);
+    this.darkWoodMat.setTexture(this.woodTexture);
+    this.darkWoodMat.setTextureWrap("REPEAT", "REPEAT");
 
     // Horse — attached to the front assembly
     this.horseModel = new MyOBJModel(scene, '/project/models/horse.obj', 1.7);
@@ -287,6 +295,7 @@ export class MyWagon {
     const wagonRadius = Math.max(this.bodyWidth, this.bodyLength) / 2 + 1.5;
     const collisionDamage = 10;
     const currentContacts = new Set();
+    const arrayPool = getArrayPool();
 
     const registerContact = (contactId) => {
       currentContacts.add(contactId);
@@ -362,6 +371,7 @@ export class MyWagon {
     }
 
     this.activeCollisionContacts = currentContacts;
+    arrayPool.releaseAll();
 
     // ════════════════════════════════════════
     // BARN is SAFE - no damage
@@ -537,6 +547,18 @@ export class MyWagon {
     this.scene.scale(this.bodyWidth, wh, wt);
     this.cube.display();
     this.scene.popMatrix();
+
+    // Driver's bench — outside the front wall (driver's seat)
+    const benchWidth  = this.bodyWidth - 0.6;
+    const benchHeight = 0.40;
+    const benchDepth  = 1.2;
+    this.darkWoodMat.apply();
+    this.scene.pushMatrix();
+    this.scene.translate(0, fy + ft + benchHeight / 2, hl + benchDepth / 2 + 0.1);
+    this.scene.scale(benchWidth, benchHeight, benchDepth);
+    this.cube.display();
+    this.scene.popMatrix();
+    this.woodMat.apply();
   }
 
   // ────────────────────────────────────────────────────────
@@ -630,6 +652,9 @@ export class MyWagon {
   display() {
     if (!this._primitivesLoaded) return;
 
+    const prevTextures = this.scene.texturesEnabled;
+    this.scene.enableTextures(true);
+
     this.scene.pushMatrix();
 
     // World position + heading
@@ -647,6 +672,7 @@ export class MyWagon {
     this.displayCarriedHayBales();
 
     this.scene.popMatrix();
+    this.scene.enableTextures(prevTextures);
 
     // Render horse in world-space so it can have independent heading and articulation
     if (this.horseModel) {
@@ -682,17 +708,23 @@ export class MyWagon {
     this.wheel = new MyWheel(this.scene, this.wheelRadius, 0.15, 0.30, 0.40, 8);
     this.cover = new MyWagonCover(this.scene, this.bodyWidth, this.bodyLength / 2, 16, 8, 5);
 
+    this.woodTexture = new CGFtexture(this.scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
+
     this.woodMat = new CGFappearance(this.scene);
     this.woodMat.setAmbient(0.40, 0.26, 0.10, 1);
     this.woodMat.setDiffuse(0.62, 0.42, 0.18, 1);
     this.woodMat.setSpecular(0.15, 0.10, 0.05, 1);
     this.woodMat.setShininess(12);
+    this.woodMat.setTexture(this.woodTexture);
+    this.woodMat.setTextureWrap("REPEAT", "REPEAT");
 
     this.darkWoodMat = new CGFappearance(this.scene);
     this.darkWoodMat.setAmbient(0.22, 0.13, 0.05, 1);
     this.darkWoodMat.setDiffuse(0.40, 0.24, 0.10, 1);
     this.darkWoodMat.setSpecular(0.10, 0.08, 0.04, 1);
     this.darkWoodMat.setShininess(8);
+    this.darkWoodMat.setTexture(this.woodTexture);
+    this.darkWoodMat.setTextureWrap("REPEAT", "REPEAT");
 
     this.horseModel = new MyOBJModel(this.scene, '/project/models/horse.obj', 1.7);
 

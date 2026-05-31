@@ -14,6 +14,13 @@ export class GameState {
     this.balesOnBoard = 0;
     this.totalBalesDelivered = 0;
 
+    // ═══════════════════ Score ═══════════════════
+    this.score = 0;             // elapsed seconds (stops on game over)
+
+    // ═══════════════════ Instantaneous feedback ═══════════════════
+    this.lastDamage = 0;        // HP lost in the most recent collision
+    this.lastHeal = 0;          // HP restored in the most recent delivery
+
     // ═══════════════════ Game State ═══════════════════
     this.gameState = 'PLAYING'; // 'PLAYING' | 'GAME_OVER'
   }
@@ -29,6 +36,7 @@ export class GameState {
 
     this.wagonHealth = Math.max(0, this.wagonHealth - amount);
     this.wagonCollisionCooldown = this.wagonCollisionCooldownDuration;
+    this.lastDamage = amount;
 
     // Check if wagon is destroyed
     if (this.wagonHealth <= 0) {
@@ -44,7 +52,11 @@ export class GameState {
   healWagon(amount = 10) {
     const previousHealth = this.wagonHealth;
     this.wagonHealth = Math.min(this.wagonMaxHealth, this.wagonHealth + amount);
-    return this.wagonHealth > previousHealth;
+    const actualHeal = this.wagonHealth - previousHealth;
+    if (actualHeal > 0) {
+      this.lastHeal = actualHeal;
+    }
+    return actualHeal > 0;
   }
 
   /**
@@ -56,6 +68,7 @@ export class GameState {
     }
 
     if (this.gameState !== 'GAME_OVER' && deltaTime > 0) {
+      this.score += deltaTime;
       this.wagonHealth = Math.max(0, this.wagonHealth - deltaTime);
       if (this.wagonHealth <= 0) {
         this.gameState = 'GAME_OVER';
@@ -120,6 +133,9 @@ export class GameState {
     this.wagonCollisionCooldown = 0;
     this.balesOnBoard = 0;
     this.totalBalesDelivered = 0;
+    this.score = 0;
+    this.lastDamage = 0;
+    this.lastHeal = 0;
     this.gameState = 'PLAYING';
   }
 }

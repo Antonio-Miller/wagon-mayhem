@@ -1,4 +1,5 @@
 import { CGFobject, CGFshader } from "../../../lib/CGF.js";
+import { getVec3Pool, getArrayPool } from "../utils/ObjectPool.js";
 
 class GrassPatch extends CGFobject {
   constructor(scene, bladeSpecs) {
@@ -67,10 +68,9 @@ export class MyGrass extends CGFobject {
     this.placementCursor = 0;
     this.placementBudgetPerFrame = 3000;
     this.densityScale = 1.0;
-    // Rendering culling / LOD
-    this.renderRadius = 60;  // reduced from 90: tighter close-range rendering
-    this.renderRadiusFar = 200;  // reduced from 300: skip farther patches sooner
-    this.lodFarFactor = 6;  // increased from 4: sparsify far patches more aggressively
+    this.renderRadius = 90;
+    this.renderRadiusFar = 300;
+    this.lodFarFactor = 4;
 
     this.shader = new CGFshader(
       this.scene.gl,
@@ -193,6 +193,7 @@ export class MyGrass extends CGFobject {
     const gl = this.scene.gl;
     const previousTexturesEnabled = this.scene.texturesEnabled;
     const cullEnabled = gl.isEnabled(gl.CULL_FACE);
+    const arrayPool = getArrayPool();
 
     this.scene.setActiveShader(this.shader);
     this.scene.enableTextures(false);
@@ -205,22 +206,22 @@ export class MyGrass extends CGFobject {
       uGrassColor: [0.18, 0.48, 0.12, 1.0],
     });
 
+    const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
+    const renderRadiusFarSq = this.renderRadiusFar * this.renderRadiusFar;
+    const renderRadiusSq = this.renderRadius * this.renderRadius;
+
     for (const patch of this.patches) {
       if (!patch.placed) {
         continue;
       }
 
-      // Distance culling + simple LOD
-      const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0,0,0];
       const dx = cam[0] - patch.x;
       const dz = cam[2] - patch.z;
-      const dist2 = dx*dx + dz*dz;
-      const r2 = this.renderRadius * this.renderRadius;
-      const rf2 = this.renderRadiusFar * this.renderRadiusFar;
+      const dist2 = dx * dx + dz * dz;
 
-      if (dist2 > rf2) continue; // too far, skip
+      if (dist2 > renderRadiusFarSq) continue; // too far, skip
 
-      if (dist2 > r2) {
+      if (dist2 > renderRadiusSq) {
         // Far LOD: only render a subset deterministically to reduce draw calls
         const key = Math.floor(patch.x * 7 + patch.z * 13) | 0;
         if ((key % this.lodFarFactor) !== 0) continue;
@@ -235,6 +236,7 @@ export class MyGrass extends CGFobject {
     if (cullEnabled) {
       gl.enable(gl.CULL_FACE);
     }
+    arrayPool.releaseAll();
     this.scene.enableTextures(previousTexturesEnabled);
     this.scene.setActiveShader(this.scene.defaultShader);
   }

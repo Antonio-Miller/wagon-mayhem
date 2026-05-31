@@ -24,6 +24,7 @@ import { GameState } from "./GameState.js";
 export class MyScene extends CGFscene {
   constructor() {
     super();
+    this.gameTitle = 'Wagon Mayhem';
     this.timeOfDay = 9; // start at 09:00
     this.playerInput = {
       w: false,
@@ -42,7 +43,7 @@ export class MyScene extends CGFscene {
       drop: false,
     };
     this.grassAmount = 0.4;    // 40% density: balances visuals with performance
-    this.renderDistance = 650;  // ~65% of max: reduces far-LOD overhead
+    this.renderDistance = 1000;
     this.carriedHayBales = [];
     this.maxCarriedHayBales = 2;
     this.barnDropSlot = 0;
@@ -55,9 +56,16 @@ export class MyScene extends CGFscene {
       heading: 0,
     };
     // Only Wagon actor is supported; actorChoice removed
+    this.gameStarted = false;
     
     // Game state manager
     this.gameState = new GameState();
+    this.isPaused = false;
+    this.cameraOrbitDrag = {
+      active: false,
+      lastX: 0,
+    };
+    this.cameraOrbitKeyDir = 0; // -1 left, +1 right
   }
 
   // Actor switching removed; only Wagon is supported
@@ -145,7 +153,7 @@ export class MyScene extends CGFscene {
     // Pass precomputed positions to sets; placement generation is centralized in distribute.js
     this.pineTrees = new MyPineTreeSet(this, treeCount, this.terrain, treePositions);
     this.rocks = new MyRockSet(this, rockCount, this.terrain, rockPositions);
-    this.flowers = new MyFlowerSet(this, 12, this.terrain, this.rocks, this.pineTrees);  // Reduced from 20 to 12 for performance
+    this.flowers = new MyFlowerSet(this, 20, this.terrain, this.rocks, this.pineTrees);
     this.physics = new MyPhysicsEngine(this, {
       gravity: -24.0,
       terminalVelocity: -90.0,
@@ -169,6 +177,8 @@ export class MyScene extends CGFscene {
     this.lastCameraDebugLogTime = 0;
 
     this.setUpdatePeriod(16);
+
+    this.setupCameraOrbitControls();
 
     // Load OBJ hay entities and position them near the terrain center
     try {
@@ -281,15 +291,96 @@ export class MyScene extends CGFscene {
       this.camera.followHeight = 6;
       this.camera.lookHeight = 2.5;
       this.camera.smoothing = 0.18;
+      this.camera.orbitSensitivity = 0.008;
+      this.camera.recenterSpeed = 0.14;
     } else if (mode === 'far') {
       this.camera.followDistance = 32;
       this.camera.followHeight = 8;
       this.camera.lookHeight = 3.0;
       this.camera.smoothing = 0.14;
+      this.camera.orbitSensitivity = 0.006;
+      this.camera.recenterSpeed = 0.10;
     } else if (mode === 'first') {
       // first-person will be handled by the scene every frame (lock to ball)
       this.camera.smoothing = 1.0;
     }
+  }
+
+  setupCameraOrbitControls() {
+    const canvas = this.gl?.canvas;
+    if (!canvas || this._cameraOrbitControlsBound) {
+      return;
+    }
+
+    this._cameraOrbitControlsBound = true;
+
+    const getCanvasX = (event) => {
+      const rect = canvas.getBoundingClientRect();
+      return event.clientX - rect.left;
+    };
+
+    canvas.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      if (this.isPaused || !this.gameStarted) return;
+      this.cameraOrbitDrag.active = true;
+      this.cameraOrbitDrag.lastX = getCanvasX(event);
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (!this.cameraOrbitDrag.active || this.isPaused || !this.gameStarted || !this.camera) return;
+      const currentX = getCanvasX(event);
+      const deltaX = currentX - this.cameraOrbitDrag.lastX;
+      this.cameraOrbitDrag.lastX = currentX;
+      if (typeof this.camera.orbit === 'function') {
+        this.camera.orbit(1, deltaX);
+      }
+    });
+
+    const stopOrbitDrag = () => {
+      this.cameraOrbitDrag.active = false;
+    };
+
+    canvas.addEventListener('pointerup', stopOrbitDrag);
+    canvas.addEventListener('pointercancel', stopOrbitDrag);
+    canvas.addEventListener('pointerleave', stopOrbitDrag);
+
+    // Keyboard N/M to orbit left/right while held
+    const onKeyDown = (ev) => {
+      if (this.isPaused || !this.gameStarted) return;
+      const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
+      if (key === 'n') {
+        if (!ev.repeat) {
+          // snap to left side (+90deg)
+          this.camera?.setOrbitAngle?.(Math.PI / 2, false);
+        } else {
+          this.cameraOrbitKeyDir = -1;
+        }
+        ev.preventDefault();
+      } else if (key === 'm') {
+        if (!ev.repeat) {
+          // snap to right side (-90deg)
+          this.camera?.setOrbitAngle?.(-Math.PI / 2, false);
+        } else {
+          this.cameraOrbitKeyDir = 1;
+        }
+        ev.preventDefault();
+      }
+    };
+
+    const onKeyUp = (ev) => {
+      const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
+      if (key === 'n' && this.cameraOrbitKeyDir === -1) this.cameraOrbitKeyDir = 0;
+      if (key === 'm' && this.cameraOrbitKeyDir === 1) this.cameraOrbitKeyDir = 0;
+
+      if ((key === 'n' || key === 'm') && this.camera) {
+        // Snap immediately back behind the wagon when either key is released
+        this.camera.setOrbitAngle?.(0, true);
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
   }
 
   setGrassAmount(amount) {
@@ -466,6 +557,57 @@ export class MyScene extends CGFscene {
 
   // Ball actor removed: initPlayerBall() deleted
 
+  clearGameplayInputs() {
+    this.playerInput = {
+      w: false,
+      a: false,
+      s: false,
+      d: false,
+      space: false,
+    };
+
+    this.actionInput.pickup = false;
+    this.actionInput.drop = false;
+
+    if (this.keys) {
+      this.keys.KeyW = false;
+      this.keys.KeyA = false;
+      this.keys.KeyS = false;
+      this.keys.KeyD = false;
+      this.keys.KeyP = false;
+      this.keys.KeyL = false;
+      this.keys.Space = false;
+      this.keys.wagonForwardGear = 1;
+      this.keys.wagonReverseGear = 1;
+    }
+
+    if (this.wagonDriveState) {
+      if (this.wagonDriveState.w) {
+        this.wagonDriveState.w.pressed = false;
+        this.wagonDriveState.w.gear = 1;
+      }
+      if (this.wagonDriveState.s) {
+        this.wagonDriveState.s.pressed = false;
+        this.wagonDriveState.s.gear = 1;
+      }
+    }
+  }
+
+  togglePause() {
+    if (!this.gameStarted) {
+      return;
+    }
+
+    if (this.gameState?.isGameOver()) {
+      return;
+    }
+
+    this.isPaused = !this.isPaused;
+    if (this.isPaused) {
+      this.clearGameplayInputs();
+    }
+  }
+
   resetGameFromGameOver() {
     if (!this.gameState || !this.gameState.isGameOver()) {
       return;
@@ -497,6 +639,56 @@ export class MyScene extends CGFscene {
     }
 
     // Wagon remains the only actor; nothing to switch
+  }
+
+  startGame() {
+    this.gameStarted = true;
+    this.isPaused = false;
+    this.clearGameplayInputs();
+    this.cameraOrbitDrag.active = false;
+    this.cameraOrbitKeyDir = 0;
+  }
+
+  getControlHelpLines() {
+    return [
+      'W - Accelerate wagon',
+      'Double tap W - Faster gear',
+      'A/D - Steer wagon',
+      'S - Stop wagon',
+      'P - Pick up nearest hay bale',
+      'L - Drop carried hay bale in barn drop area',
+      'SHIFT - Cycle camera mode',
+      'N - Snap camera left (90°) / hold to orbit left',
+      'M - Snap camera right (90°) / hold to orbit right',
+      'Left-click + drag - Orbit camera sideways (hold to prevent snap back)',
+      'R - Reset game (when Game Over)',
+      'ESC - Resume game',
+    ];
+  }
+
+  startGame() {
+    this.gameStarted = true;
+    this.isPaused = false;
+    this.clearGameplayInputs();
+    this.cameraOrbitDrag.active = false;
+    this.cameraOrbitKeyDir = 0;
+  }
+
+  getControlHelpLines() {
+    return [
+      'W - Accelerate wagon',
+      'Double tap W - Faster gear',
+      'A/D - Steer wagon',
+      'S - Stop wagon',
+      'P - Pick up nearest hay bale',
+      'L - Drop carried hay bale in barn drop area',
+      'SHIFT - Cycle camera mode',
+      'N - Snap camera left (90°) / hold to orbit left',
+      'M - Snap camera right (90°) / hold to orbit right',
+      'Left-click + drag - Orbit camera sideways (hold to prevent snap back)',
+      'R - Reset game (when Game Over)',
+      'ESC - Resume game',
+    ];
   }
 
   // Ball collision handling removed
@@ -1238,6 +1430,10 @@ export class MyScene extends CGFscene {
       this.keys.KeyR = false;
     }
 
+    if (this.isPaused) {
+      return;
+    }
+
     // Advance time of day: 5 hours every 5 real seconds -> 1 hour/sec (10x faster)
     // (deltaTime is in seconds; deltaTime * 1.0 -> hours advanced)
     if (deltaTime > 0 && this.timeOfDay !== undefined) {
@@ -1293,11 +1489,24 @@ export class MyScene extends CGFscene {
       }
       this.wagon.updateTerrainAlignment(this.terrain, deltaTime);
       this.processHayActions();
-      
       // Make camera follow wagon when it's active
       if (this.camera && typeof this.camera.follow === 'function') {
         const target = vec3.fromValues(this.wagon.x, this.wagon.y, this.wagon.z);
-        this.camera.follow(target, this.wagon.heading || 0);
+        // Apply keyboard-driven orbit (N/M held)
+        const keyMoveSpeed = 120; // pixels/sec equivalent
+        if (this.cameraOrbitKeyDir !== 0 && !this.isPaused) {
+          // deltaTime is seconds
+          this.camera.orbit(1, this.cameraOrbitKeyDir * keyMoveSpeed * deltaTime);
+        }
+
+        // Recenter orbit automatically only when not dragging or holding orbit keys
+        if (this.wagon.speed > 0.05 && !this.cameraOrbitDrag.active && this.cameraOrbitKeyDir === 0) {
+          this.camera.recenterOrbit?.(this.camera.recenterSpeed ?? 0.14);
+        }
+
+        this.camera.follow(target, this.wagon.heading || 0, {
+          orbitOffset: this.camera.orbitOffset || 0,
+        });
       }
     }
 
@@ -1531,6 +1740,57 @@ export class MyScene extends CGFscene {
       ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
       ctx.font = '20px Arial';
       ctx.fillText('Press R to reset the game', canvas.width / 2, canvas.height / 2 + 80);
+      return;
+    }
+
+    if (this.isPaused) {
+      // Dimmed fullscreen backdrop
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const panelWidth = Math.min(820, canvas.width * 0.88);
+      const panelHeight = Math.min(880, canvas.height);
+      const panelX = (canvas.width - panelWidth) * 0.5;
+      const panelY = (canvas.height - panelHeight) * 0.5;
+
+      // Main panel
+      ctx.fillStyle = 'rgba(24, 24, 24, 0.92)';
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.strokeStyle = 'rgba(255, 220, 140, 0.95)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+      const centerX = panelX + panelWidth * 0.5;
+      let y = panelY + 62;
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = 'rgba(255, 230, 170, 1)';
+      ctx.font = 'bold 64px Arial';
+      ctx.fillText('PAUSED', centerX, y);
+
+      y += 72;
+      ctx.fillStyle = 'rgba(220, 220, 220, 0.95)';
+      ctx.font = 'bold 30px Arial';
+      ctx.fillText('Controls', centerX, y);
+
+      const controls = this.getControlHelpLines();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(240, 240, 240, 0.95)';
+      ctx.font = '24px Arial';
+      const textX = panelX + 56;
+      y += 56;
+      for (const line of controls) {
+        ctx.fillText(line, textX, y);
+        y += 50;
+      }
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 210, 130, 0.95)';
+      ctx.font = 'bold 26px Arial';
+      ctx.fillText('Press ESC to continue', centerX, panelY + panelHeight - 54);
     }
   }
 }

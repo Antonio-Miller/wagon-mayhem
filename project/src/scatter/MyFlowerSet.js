@@ -1,5 +1,6 @@
 import { CGFobject } from "../../../lib/CGF.js";
 import { MyFlower } from "./MyFlower.js";
+import { getArrayPool } from "../utils/ObjectPool.js";
 
 function randomRange(min, max) {
   return min + Math.random() * (max - min);
@@ -205,6 +206,7 @@ export class MyFlowerSet extends CGFobject {
     // Get camera position for distance culling
     const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
     const flowerRenderDist = 280;  // Render flowers within 280 units of camera
+    const arrayPool = getArrayPool();
 
     for (let i = 0; i < this.flowers.length; i++) {
       const flowerEntry = this.flowers[i];
@@ -231,5 +233,6 @@ export class MyFlowerSet extends CGFobject {
       flowerEntry.flower.display();
       this.scene.popMatrix();
     }
+    arrayPool.releaseAll();
   }
 }

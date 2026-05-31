@@ -1,5 +1,6 @@
-import { CGFobject, CGFappearance } from "../../../lib/CGF.js";
+import { CGFobject, CGFappearance, CGFtexture } from "../../../lib/CGF.js";
 import { MyRock } from "../entities/MyRock.js";
+import { getArrayPool } from "../utils/ObjectPool.js";
 
 export class MyRockSet extends CGFobject {
   constructor(scene, amount, terrain, predefinedPositions = null) {
@@ -8,12 +9,15 @@ export class MyRockSet extends CGFobject {
     this.rocks = [];
     this.pathClearance = 15; // rocks need clearance from path and barn
 
-    // Setup an appearance for the rocks (greyish dry stone)
+    // Setup an appearance for the rocks (greyish dry stone with terrain texture)
+    this.rockTexture = new CGFtexture(this.scene, "/project/textures/Rugged%20Terrain%20Diffuse%20PNG.png");
     this.rockMaterial = new CGFappearance(this.scene);
-    this.rockMaterial.setAmbient(0.3, 0.35, 0.3, 1);
-    this.rockMaterial.setDiffuse(0.4, 0.45, 0.4, 1);
-    this.rockMaterial.setSpecular(0.1, 0.1, 0.1, 1);
+    this.rockMaterial.setAmbient(0.35, 0.33, 0.30, 1);
+    this.rockMaterial.setDiffuse(0.50, 0.48, 0.44, 1);
+    this.rockMaterial.setSpecular(0.12, 0.12, 0.12, 1);
     this.rockMaterial.setShininess(10);
+    this.rockMaterial.setTexture(this.rockTexture);
+    this.rockMaterial.setTextureWrap("REPEAT", "REPEAT");
     
     // Pre-generate the rock transforms and geometry
     const positionsToUse = Array.isArray(predefinedPositions) ? predefinedPositions : null;
@@ -75,10 +79,13 @@ export class MyRockSet extends CGFobject {
   }
 
   display() {
+    const prevTextures = this.scene.texturesEnabled;
+    this.scene.enableTextures(true);
     this.rockMaterial.apply();
 
     const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
-    const rockRenderDist = 250;  // Render rocks within 350 units of camera
+    const rockRenderDist = 250;  // Render rocks within 250 units of camera
+    const arrayPool = getArrayPool();
 
     // Since the heightmap image runs asynchronously, we check its height 
     // dynamically right before displaying. Once we get a valid heightmap,
@@ -116,5 +123,7 @@ export class MyRockSet extends CGFobject {
       r.rock.display();
       this.scene.popMatrix();
     }
+    arrayPool.releaseAll();
+    this.scene.enableTextures(prevTextures);
   }
 }

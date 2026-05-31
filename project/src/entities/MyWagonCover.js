@@ -1,4 +1,4 @@
-import { CGFobject, CGFappearance } from "../../../lib/CGF.js";
+import { CGFobject, CGFappearance, CGFtexture } from "../../../lib/CGF.js";
 import { MyUnitCube } from "../primitives/MyUnitCube.js";
 
 /**
@@ -43,12 +43,15 @@ export class MyWagonCover extends CGFobject {
     this.clothMat.setSpecular(0.08, 0.08, 0.08, 1);
     this.clothMat.setShininess(5);
 
-    // ── Wooden rib appearance ──
+    // ── Wooden rib appearance (textured) ──
+    this.woodTexture = new CGFtexture(scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
     this.ribMat = new CGFappearance(scene);
     this.ribMat.setAmbient(0.35, 0.22, 0.08, 1);
     this.ribMat.setDiffuse(0.55, 0.35, 0.15, 1);
     this.ribMat.setSpecular(0.12, 0.08, 0.04, 1);
     this.ribMat.setShininess(8);
+    this.ribMat.setTexture(this.woodTexture);
+    this.ribMat.setTextureWrap("REPEAT", "REPEAT");
   }
 
   // ── Half-cylinder mesh ─────────────────────────────────────

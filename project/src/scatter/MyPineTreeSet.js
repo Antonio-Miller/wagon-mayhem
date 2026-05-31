@@ -1,5 +1,6 @@
 import { CGFobject } from "../../../lib/CGF.js";
 import { MyPineTree } from "../entities/MyPineTree.js";
+import { getArrayPool } from "../utils/ObjectPool.js";
 
 export class MyPineTreeSet extends CGFobject {
   constructor(scene, amount, terrain, predefinedPositions = null) {
@@ -69,6 +70,7 @@ export class MyPineTreeSet extends CGFobject {
   display() {
     const cam = this.scene.camera && this.scene.camera.position ? this.scene.camera.position : [0, 0, 0];
     const treeRenderDist = 380;  // Render trees within 380 units of camera
+    const arrayPool = getArrayPool();
 
     for (let i = 0; i < this.trees.length; i++) {
       const t = this.trees[i];
@@ -96,5 +98,6 @@ export class MyPineTreeSet extends CGFobject {
       t.tree.display();
       this.scene.popMatrix();
     }
+    arrayPool.releaseAll();
   }
 }
