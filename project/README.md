@@ -4,8 +4,8 @@ Final project for CGRA 2025/2026 at FEUP.
 
 ## Team
 
-- António Tavares Miller
-- José Barbosa Reis
+- António Miller - up202008423
+- José Reis - up202307304
 
 ## Project Summary
 
