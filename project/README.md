@@ -29,9 +29,8 @@ Main result: a complete outdoor environment that already looked coherent even be
 
 Screenshots:
 
-- [environment_1.png](screenshots/environment_1.png)
-- [environment_2.png](screenshots/environment_2.png)
-- [environment_3.png](screenshots/environment_3.png)
+- [environment_2.jpg](screenshots/environment_2.jpg)
+- [environment_3.jpg](screenshots/environment_3.jpg)
 
 ### Phase 2 - Terrain, Ground and Scatter
 
@@ -48,8 +47,7 @@ Main result: the prairie started functioning as a navigable level instead of a s
 
 Screenshots:
 
-- [terrain_1.png](screenshots/terrain_1.png)
-- [terrain_2.png](screenshots/terrain_2.png)
+- [terrain_2.jpg](screenshots/terrain_2.jpg)
 
 ### Phase 3 - Flora
 
@@ -66,8 +64,8 @@ Main result: the prairie gained density and life without collapsing performance.
 
 Screenshots:
 
-- [flora_1.png](screenshots/flora_1.png)
-- [flora_2.png](screenshots/flora_2.png)
+- [flora_1.jpg](screenshots/flora_1.jpg)
+- [flora_2.jpg](screenshots/flora_2.jpg)
 
 ### Phase 4 - Wagon, Movement and Animation
 
@@ -84,7 +82,7 @@ Main result: the scene became interactive and the player could move through the 
 
 Screenshots:
 
-- [interaction_1.png](screenshots/interaction_1.png)
+- (no interaction screenshot available)
 
 ### Phase 5 - Gameplay and UI
 
@@ -102,11 +100,9 @@ Main result: the project became a complete game with a clear objective and failu
 
 Screenshots:
 
-- [gameplay_2.png](screenshots/gameplay_2.png)
-- [final_1.png](screenshots/final_1.png)
-- [final_2.png](screenshots/final_2.png)
-- [final_3.png](screenshots/final_3.png)
-- [final_4.png](screenshots/final_4.png)
+- [gameplay_2.jpg](screenshots/gameplay_2.jpg)
+- [final_1.jpg](screenshots/final_1.jpg)
+- [final_2.jpg](screenshots/final_2.jpg)
 
 ## Technical Innovations
 
