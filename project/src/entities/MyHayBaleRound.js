@@ -1,5 +1,6 @@
 import { CGFobject, CGFappearance, CGFtexture } from "../../../lib/CGF.js";
 import { MyCilinder } from "../primitives/MyCilinder.js";
+import { MyCone } from "../primitives/MyCone.js";
 
 export class MyHayBaleRound extends CGFobject {
   constructor(scene, scale = 8.0) {
@@ -37,6 +38,17 @@ export class MyHayBaleRound extends CGFobject {
     }
 
     this.appearance = app;
+
+    // Arrow indicator primitives
+    this.arrowCone = new MyCone(scene, 16, 1, 0.3, 0.5); // arrowhead
+    
+    // Arrow appearance (bright yellow)
+    const arrowApp = new CGFappearance(scene);
+    arrowApp.setAmbient(1.0, 1.0, 0.0, 0.8);
+    arrowApp.setDiffuse(1.0, 1.0, 0.0, 0.8);
+    arrowApp.setSpecular(1.0, 1.0, 0.0, 0.8);
+    arrowApp.setShininess(32);
+    this.arrowAppearance = arrowApp;
   }
 
   display() {
@@ -61,6 +73,7 @@ export class MyHayBaleRound extends CGFobject {
       this.displayAtPosition(pos[0], pos[1], pos[2], {
         alignToTerrain: true,
       });
+      this.displayArrowIndicator(pos[0], pos[1], pos[2]);
       return;
     }
 
@@ -207,5 +220,20 @@ export class MyHayBaleRound extends CGFobject {
       forwardNorm[0], forwardNorm[1], forwardNorm[2], 0,
       0, 0, 0, 1,
     ]);
+  }
+
+  displayArrowIndicator(x, y, z) {
+    const prevTexturesEnabled = this.scene.texturesEnabled;
+    this.scene.enableTextures(false);
+
+    this.scene.pushMatrix();
+    this.scene.translate(x, y + this.maxY + 0.5, z);
+    this.scene.rotate(Math.PI, 1, 0, 0); // flip cone to point up
+    this.scene.scale(1.5, 1.5, 1.5); // make it bigger
+    this.arrowAppearance.apply();
+    this.arrowCone.display();
+    this.scene.popMatrix();
+    
+    this.scene.enableTextures(prevTexturesEnabled);
   }
 }
