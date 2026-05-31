@@ -34,7 +34,7 @@ export class MyBarn extends CGFobject {
     this.bodyTop = new MyIsosceleTriangularPrism(scene, this.roofBaseWidth, this.upperBodyHeight, depth);
 
     // Apply the same wood texture with different tints per barn section.
-    this.woodTexture = new CGFtexture(this.scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
+    this.woodTexture = new CGFtexture(this.scene, "src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
 
     this.redWoodAppearance = new CGFappearance(this.scene);
     this.redWoodAppearance.setAmbient(0.55, 0.12, 0.12, 1.0);

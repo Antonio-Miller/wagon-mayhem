@@ -90,9 +90,9 @@ export class MyOBJModel extends CGFobject {
         const basename = texPath.split(/[\\/]/).pop();
         if (basename && basename.length) {
           if (baseUrl) candidates.push(baseUrl + basename);
-          candidates.push('/project/models/' + basename);
-          candidates.push('/project/textures/' + basename);
-          candidates.push('/project/src/textures/' + basename);
+          candidates.push('models/' + basename);
+          candidates.push('textures/' + basename);
+          candidates.push('src/textures/' + basename);
         }
         // Also prefer absolute path if it starts with '/'
         if (texPath.startsWith('/')) candidates.unshift(texPath);

@@ -44,7 +44,7 @@ export class MyWagonCover extends CGFobject {
     this.clothMat.setShininess(5);
 
     // ── Wooden rib appearance (textured) ──
-    this.woodTexture = new CGFtexture(scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
+    this.woodTexture = new CGFtexture(scene, "src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
     this.ribMat = new CGFappearance(scene);
     this.ribMat.setAmbient(0.35, 0.22, 0.08, 1);
     this.ribMat.setDiffuse(0.55, 0.35, 0.15, 1);

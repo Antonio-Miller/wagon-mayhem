@@ -12,7 +12,7 @@ export class MyClouds extends CGFobject {
     this.dome = new MySphere(scene, 20, 40, 295, true);
     this.baseTexCoords = Array.from(this.dome.texCoords);
 
-    this.cloudTexture = new CGFtexture(this.scene, "/project/textures/clouds.png");
+    this.cloudTexture = new CGFtexture(this.scene, "textures/clouds.png");
     this.cloudAppearance = new CGFappearance(this.scene);
     this.cloudAppearance.setAmbient(1, 1, 1, 0.65);
     this.cloudAppearance.setDiffuse(1, 1, 1, 0.65);

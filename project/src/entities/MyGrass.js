@@ -74,8 +74,8 @@ export class MyGrass extends CGFobject {
 
     this.shader = new CGFshader(
       this.scene.gl,
-      "/project/src/shaders/grass.vert",
-      "/project/src/shaders/grass.frag"
+      "src/shaders/grass.vert",
+      "src/shaders/grass.frag"
     );
     this.shader.setUniformsValues({
       uTime: 0,

@@ -10,7 +10,7 @@ export class MyRockSet extends CGFobject {
     this.pathClearance = 15; // rocks need clearance from path and barn
 
     // Setup an appearance for the rocks (greyish dry stone with terrain texture)
-    this.rockTexture = new CGFtexture(this.scene, "/project/textures/Rugged%20Terrain%20Diffuse%20PNG.png");
+    this.rockTexture = new CGFtexture(this.scene, "textures/Rugged%20Terrain%20Diffuse%20PNG.png");
     this.rockMaterial = new CGFappearance(this.scene);
     this.rockMaterial.setAmbient(0.35, 0.33, 0.30, 1);
     this.rockMaterial.setDiffuse(0.50, 0.48, 0.44, 1);

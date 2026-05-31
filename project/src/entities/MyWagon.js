@@ -78,7 +78,7 @@ export class MyWagon {
 
     // ═══════════════════ Materials ═══════════════════
     // Wood plank texture (shared by both light and dark wood)
-    this.woodTexture = new CGFtexture(scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
+    this.woodTexture = new CGFtexture(scene, "src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
 
     // Light wood — body
     this.woodMat = new CGFappearance(scene);
@@ -99,7 +99,7 @@ export class MyWagon {
     this.darkWoodMat.setTextureWrap("REPEAT", "REPEAT");
 
     // Horse — attached to the front assembly
-    this.horseModel = new MyOBJModel(scene, '/project/models/horse.obj', 1.7);
+    this.horseModel = new MyOBJModel(scene, 'models/horse.obj', 1.7);
 
     // Metal — axles
     this.metalMat = new CGFappearance(scene);
@@ -708,7 +708,7 @@ export class MyWagon {
     this.wheel = new MyWheel(this.scene, this.wheelRadius, 0.15, 0.30, 0.40, 8);
     this.cover = new MyWagonCover(this.scene, this.bodyWidth, this.bodyLength / 2, 16, 8, 5);
 
-    this.woodTexture = new CGFtexture(this.scene, "/project/src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
+    this.woodTexture = new CGFtexture(this.scene, "src/shaders/Poliigon_WoodFloorAsh_4186_BaseColor.jpg");
 
     this.woodMat = new CGFappearance(this.scene);
     this.woodMat.setAmbient(0.40, 0.26, 0.10, 1);
@@ -726,7 +726,7 @@ export class MyWagon {
     this.darkWoodMat.setTexture(this.woodTexture);
     this.darkWoodMat.setTextureWrap("REPEAT", "REPEAT");
 
-    this.horseModel = new MyOBJModel(this.scene, '/project/models/horse.obj', 1.7);
+    this.horseModel = new MyOBJModel(this.scene, 'models/horse.obj', 1.7);
 
     this.metalMat = new CGFappearance(this.scene);
     this.metalMat.setAmbient(0.20, 0.20, 0.22, 1);

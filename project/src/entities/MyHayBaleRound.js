@@ -28,7 +28,7 @@ export class MyHayBaleRound extends CGFobject {
     app.setSpecular(0.3, 0.3, 0.3, 1.0);
     app.setShininess(16);
     try {
-      const tex = new CGFtexture(scene, "/project/textures/Straw_D.tga.png");
+      const tex = new CGFtexture(scene, "textures/Straw_D.tga.png");
       app.setTexture(tex);
       app.setTextureWrap("REPEAT", "REPEAT");
       console.log('[MyHayBaleRound] Texture loaded successfully');

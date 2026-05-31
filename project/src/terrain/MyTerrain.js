@@ -11,7 +11,7 @@ export class MyTerrain {
     divisions = 120,
     size = 800,
     maxHeight = 120,
-    heightmapPath = "/project/textures/Rugged%20Terrain%20Height%20Map%20PNG.png"
+    heightmapPath = "textures/Rugged%20Terrain%20Height%20Map%20PNG.png"
   ) {
     this.scene = scene;
     this.divisions = divisions;
@@ -21,7 +21,7 @@ export class MyTerrain {
 
     this.plane = new MyPlane(scene, divisions, size, size);
     this.heightmap = new CGFtexture(this.scene, heightmapPath);
-    this.terrainTexture = new CGFtexture(this.scene, "/project/textures/Rugged%20Terrain%20Diffuse%20PNG.png");
+    this.terrainTexture = new CGFtexture(this.scene, "textures/Rugged%20Terrain%20Diffuse%20PNG.png");
     this.heightmapCanvas = document.createElement("canvas");
     this.heightmapContext = this.heightmapCanvas.getContext("2d", { willReadFrequently: true });
     this.heightmapPixels = null;
@@ -34,8 +34,8 @@ export class MyTerrain {
 
     this.shader = new CGFshader(
       this.scene.gl,
-      "/project/src/shaders/terrain.vert",
-      "/project/src/shaders/terrain.frag"
+      "src/shaders/terrain.vert",
+      "src/shaders/terrain.frag"
     );
     this.shader.setUniformsValues({
       uHeightmap: 0,
