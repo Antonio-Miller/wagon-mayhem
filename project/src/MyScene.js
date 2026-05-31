@@ -24,6 +24,7 @@ import { GameState } from "./GameState.js";
 export class MyScene extends CGFscene {
   constructor() {
     super();
+    this.gameTitle = 'Wagon Mayhem';
     this.timeOfDay = 9; // start at 09:00
     this.playerInput = {
       w: false,
@@ -55,6 +56,7 @@ export class MyScene extends CGFscene {
       heading: 0,
     };
     // Only Wagon actor is supported; actorChoice removed
+    this.gameStarted = false;
     
     // Game state manager
     this.gameState = new GameState();
@@ -319,14 +321,14 @@ export class MyScene extends CGFscene {
 
     canvas.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
-      if (this.isPaused) return;
+      if (this.isPaused || !this.gameStarted) return;
       this.cameraOrbitDrag.active = true;
       this.cameraOrbitDrag.lastX = getCanvasX(event);
       canvas.setPointerCapture?.(event.pointerId);
     });
 
     canvas.addEventListener('pointermove', (event) => {
-      if (!this.cameraOrbitDrag.active || this.isPaused || !this.camera) return;
+      if (!this.cameraOrbitDrag.active || this.isPaused || !this.gameStarted || !this.camera) return;
       const currentX = getCanvasX(event);
       const deltaX = currentX - this.cameraOrbitDrag.lastX;
       this.cameraOrbitDrag.lastX = currentX;
@@ -345,7 +347,7 @@ export class MyScene extends CGFscene {
 
     // Keyboard N/M to orbit left/right while held
     const onKeyDown = (ev) => {
-      if (this.isPaused) return;
+      if (this.isPaused || !this.gameStarted) return;
       const key = (ev && ev.key) ? ev.key.toLowerCase() : '';
       if (key === 'n') {
         if (!ev.repeat) {
@@ -592,6 +594,10 @@ export class MyScene extends CGFscene {
   }
 
   togglePause() {
+    if (!this.gameStarted) {
+      return;
+    }
+
     if (this.gameState?.isGameOver()) {
       return;
     }
@@ -633,6 +639,56 @@ export class MyScene extends CGFscene {
     }
 
     // Wagon remains the only actor; nothing to switch
+  }
+
+  startGame() {
+    this.gameStarted = true;
+    this.isPaused = false;
+    this.clearGameplayInputs();
+    this.cameraOrbitDrag.active = false;
+    this.cameraOrbitKeyDir = 0;
+  }
+
+  getControlHelpLines() {
+    return [
+      'W - Accelerate wagon',
+      'Double tap W - Faster gear',
+      'A/D - Steer wagon',
+      'S - Stop wagon',
+      'P - Pick up nearest hay bale',
+      'L - Drop carried hay bale in barn drop area',
+      'SHIFT - Cycle camera mode',
+      'N - Snap camera left (90°) / hold to orbit left',
+      'M - Snap camera right (90°) / hold to orbit right',
+      'Left-click + drag - Orbit camera sideways (hold to prevent snap back)',
+      'R - Reset game (when Game Over)',
+      'ESC - Resume game',
+    ];
+  }
+
+  startGame() {
+    this.gameStarted = true;
+    this.isPaused = false;
+    this.clearGameplayInputs();
+    this.cameraOrbitDrag.active = false;
+    this.cameraOrbitKeyDir = 0;
+  }
+
+  getControlHelpLines() {
+    return [
+      'W - Accelerate wagon',
+      'Double tap W - Faster gear',
+      'A/D - Steer wagon',
+      'S - Stop wagon',
+      'P - Pick up nearest hay bale',
+      'L - Drop carried hay bale in barn drop area',
+      'SHIFT - Cycle camera mode',
+      'N - Snap camera left (90°) / hold to orbit left',
+      'M - Snap camera right (90°) / hold to orbit right',
+      'Left-click + drag - Orbit camera sideways (hold to prevent snap back)',
+      'R - Reset game (when Game Over)',
+      'ESC - Resume game',
+    ];
   }
 
   // Ball collision handling removed
@@ -1719,20 +1775,7 @@ export class MyScene extends CGFscene {
       ctx.font = 'bold 30px Arial';
       ctx.fillText('Controls', centerX, y);
 
-      const controls = [
-        'W - Accelerate wagon',
-        'Double tap W - Faster gear',
-        'A/D - Steer wagon',
-        'S - Stop wagon',
-        'P - Pick up nearest hay bale',
-        'L - Drop carried hay bale in barn drop area',
-        'SHIFT - Cycle camera mode',
-        'N - Snap camera left (90°) / hold to orbit left',
-        'M - Snap camera right (90°) / hold to orbit right',
-        'Left-click + drag - Orbit camera sideways (hold to prevent snap back)',
-        'R - Reset game (when Game Over)',
-        'ESC - Resume game',
-      ];
+      const controls = this.getControlHelpLines();
 
       ctx.textAlign = 'left';
       ctx.fillStyle = 'rgba(240, 240, 240, 0.95)';
