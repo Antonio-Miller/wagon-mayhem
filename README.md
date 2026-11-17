@@ -2,7 +2,7 @@
 
 A 3D survival game that runs in the browser, built with **WebGL** and **GLSL** shaders. The player drives a covered wagon across a spring prairie, collects hay bales, avoids rocks and trees, and delivers the bales to the barn to recover health.
 
-Built by a team of 2 as the final project of the Computer Graphics course (L.EIC, FEUP, 2025/26).
+Built by a team of 2 as the final project of the Computer Graphics course (L.EIC, FEUP, 2025/26). Project grade: **16.1/20**.
 
 <p align="center">
   <a href="https://youtu.be/6B_4PcfygfA">
