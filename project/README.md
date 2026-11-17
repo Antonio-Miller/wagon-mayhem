@@ -243,7 +243,7 @@ Existing project screenshots in this repository:
 - [final_2.png](screenshots/final_2.png)
 - [final_3.png](screenshots/final_3.png)
 - [final_4.png](screenshots/final_4.png)
-- [final.webm](screenshots/final.webm)
+- [Gameplay video (YouTube)](https://youtu.be/6B_4PcfygfA)
 
 
 
